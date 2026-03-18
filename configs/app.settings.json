@@ -1,0 +1,68 @@
+{
+  "application": {
+    "id": "demo-fullstack-app",
+    "displayName": "Demo Fullstack Platform",
+    "region": "us-east-1",
+    "timezone": "UTC"
+  },
+  "frontend": {
+    "api": {
+      "baseUrl": "http://localhost:4000",
+      "retry": {
+        "attempts": 3,
+        "backoffMs": 250
+      },
+      "timeoutMs": 10000
+    },
+    "features": {
+      "advancedSearch": true,
+      "betaDashboard": true,
+      "exportCsv": false
+    },
+    "ui": {
+      "defaultLocale": "en",
+      "supportedLocales": [
+        "en",
+        "fr",
+        "de"
+      ]
+    }
+  },
+  "backend": {
+    "http": {
+      "bodyLimit": "2mb",
+      "corsOrigins": [
+        "http://localhost:5173",
+        "http://127.0.0.1:5173"
+      ],
+      "port": 4000,
+      "requestTimeoutMs": 10000
+    },
+    "middleware": {
+      "helmet": true,
+      "rateLimit": {
+        "enabled": true,
+        "max": 120,
+        "windowMs": 60000
+      },
+      "requestLogger": true
+    }
+  },
+  "integrations": {
+    "cache": {
+      "provider": "redis",
+      "url": "redis://localhost:6379/0"
+    },
+    "database": {
+      "pool": {
+        "max": 12,
+        "min": 2
+      },
+      "url": "postgres://postgres:postgres@localhost:5432/demoapp"
+    },
+    "telemetry": {
+      "enabled": false,
+      "sentryDsn": ""
+    }
+  }
+}

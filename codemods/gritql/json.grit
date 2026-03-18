@@ -1,0 +1,114 @@
+engine marzano(0.1)
+language json
+
+// JSON codemods equivalent to the Comby package-mods*.toml rules
+or {
+	// workspaces-array-to-object
+	`"workspaces": [
+		$workspaces
+	]`
+		=>
+	`"workspaces": {
+		"packages": [
+			$workspaces
+		],
+		"nohoist": [
+			"**/lodash*"
+		]
+	}`,
+
+	// add-nested-prettier (and keep existing devDependencies)
+	`"devDependencies": {
+		$deps
+	},`
+		=>
+	`"prettier": {
+		"semi": true,
+		"singleQuote": true,
+		"trailingComma": "all",
+		"overrides": [
+			{
+				"files": "*.json",
+				"options": {
+					"tabWidth": 2
+				}
+			}
+		]
+	},
+	"devDependencies": {
+		$deps
+	},`,
+
+	// remove-private-flag-and-add-publishConfig
+	`"name": $name,
+	"private": true,
+	"version": $version,`
+		=>
+	`"name": $name,
+	"version": $version,
+	"publishConfig": {
+		"access": "public",
+		"registry": "https://registry.npmjs.org/"
+	},`,
+
+	// add-script-in-middle (preview after dev:backend)
+	`"dev:backend": $cmd,`
+		=>
+	`"dev:backend": $cmd,
+		"preview": "npm run build && npm run start",`,
+
+	// inject-dependency (typescript + vitest at top of devDependencies)
+	`"devDependencies": {
+		$deps
+	}`
+		=>
+	`"devDependencies": {
+		"typescript": "^5.2.2",
+		"vitest": "^1.0.0",
+		$deps
+	}`,
+
+	// modify-specific-nested-value (workspaces.packages)
+	`"packages": [
+			$packages
+		]`
+		=>
+	`"packages": [
+			"shared",
+			$packages
+		]`,
+
+	// add-test-script
+	`"scripts": {
+		$scripts
+	}`
+		=>
+	`"scripts": {
+		"test": "npm --workspace frontend run test && npm --workspace backend run test",
+		$scripts
+	}`,
+
+	// update-node-engine
+	`"engines": {
+		"node": ">=20.10.0"
+	}`
+		=>
+	`"engines": {
+		"node": ">=22.0.0",
+		"npm": ">=10.0.0"
+	}`,
+
+	// add-author-and-license
+	`"version": $version,
+	"description": $description,`
+		=>
+	`"version": $version,
+	"description": $description,
+	"author": "Development Team",
+	"license": "MIT",`,
+
+	// update-concurrently
+	`"concurrently": "^9.1.2"`
+		=>
+	`"concurrently": "^9.2.0"`
+}

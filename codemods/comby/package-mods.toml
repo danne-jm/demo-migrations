@@ -1,0 +1,45 @@
+[add-test-script]
+match = '''
+  "scripts": {
+    :[scripts]
+  }
+'''
+rewrite = '''
+  "scripts": {
+    "test": "npm --workspace frontend run test && npm --workspace backend run test",
+    :[scripts]
+  }
+'''
+
+[update-node-engine]
+match = '''
+  "engines": {
+    "node": ">=20.10.0"
+  }
+'''
+rewrite = '''
+  "engines": {
+    "node": ">=22.0.0",
+    "npm": ">=10.0.0"
+  }
+'''
+
+[add-author-and-license]
+match = '''
+  "version": ":[version]",
+  "description": ":[description]",
+'''
+rewrite = '''
+  "version": ":[version]",
+  "description": ":[description]",
+  "author": "Development Team",
+  "license": "MIT",
+'''
+
+[update-concurrently]
+match = '''
+    "concurrently": "^9.1.2"
+'''
+rewrite = '''
+    "concurrently": "^9.2.0"
+'''

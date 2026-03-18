@@ -1,0 +1,39 @@
+type: specs.openrewrite.org/v1beta/recipe
+name: com.yourorg.CompleteEnvTest
+recipeList:
+  # 1. RENAME: OLD_API_PORT -> APP_PORT
+  - org.openrewrite.text.FindAndReplace:
+      find: '(?m)^(?!\s*#)\s*OLD_API_PORT\s*=\s*(.*)\r?$'
+      replace: 'APP_PORT=$1'
+      regex: true
+      filePattern: '.env'
+
+  # 2. UPDATE: Force NODE_ENV to production
+  - org.openrewrite.text.FindAndReplace:
+      find: '(?m)^(?!\s*#)\s*NODE_ENV\s*=\s*.*?\r?$'
+      replace: 'NODE_ENV=production'
+      regex: true
+      filePattern: '.env'
+
+  # 3. COMMENT: Disable DEBUG_MODE
+  - org.openrewrite.text.FindAndReplace:
+      find: '(?m)^(?!\s*#)\s*(DEBUG_MODE=.*)\r?$'
+      replace: '# $1'
+      regex: true
+      filePattern: '.env'
+
+  # 4. APPEND: Add IS_NEW_KEY=true (ONLY to .env)
+  - org.openrewrite.text.FindAndReplace:
+      find: '^(?![\s\S]*IS_NEW_KEY=true)[\s\S]*?\z'
+      replace: |
+        $0
+        IS_NEW_KEY=true
+      regex: true
+      filePattern: '.env'
+
+  # 5. SMART AUTO-NEST: Only nest specific prefixes
+  - org.openrewrite.text.FindAndReplace:
+      find: '(?m)^(?!\s*#)\s*(DB|API|AWS|S3|MAIL)_([A-Z0-9_]+)\s*=\s*(.*)\r?$'
+      replace: '$1__$2=$3'
+      regex: true
+      filePattern: '.env'

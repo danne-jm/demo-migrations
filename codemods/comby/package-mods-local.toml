@@ -1,0 +1,38 @@
+#comby -config codemods/comby/package-mods-local.toml -f package.json
+
+[add-script-in-middle]
+# You don't have to capture the entire "scripts" block. 
+# You can just target a specific entry and insert something right after it.
+match = '''
+    "dev:backend": ":[cmd]",
+'''
+rewrite = '''
+    "dev:backend": ":[cmd]",
+    "preview": "npm run build && npm run start",
+'''
+
+[inject-dependency]
+# You can insert at the beginning of a block by just matching the opening structure.
+match = '''
+  "devDependencies": {
+'''
+rewrite = '''
+  "devDependencies": {
+    "typescript": "^5.2.2",
+    "vitest": "^1.0.0",
+'''
+
+[modify-specific-nested-value]
+# Target a deeply nested value directly without caring about the rest of the structure.
+# If we had "workspaces": { "packages": [...] }, we could match the array directly:
+match = '''
+    "packages": [
+      :[packages]
+    ]
+'''
+rewrite = '''
+    "packages": [
+      "shared",
+      :[packages]
+    ]
+'''

@@ -1,0 +1,24 @@
+{
+  "name": "demo-project",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Fullstack TypeScript monorepo with React frontend and Koa backend",
+  "workspaces": [
+    "frontend",
+    "backend"
+  ],
+  "scripts": {
+    "dev": "concurrently -n frontend,backend -c cyan,magenta \"npm --workspace frontend run dev\" \"npm --workspace backend run dev\"",
+    "dev:frontend": "npm --workspace frontend run dev",
+    "dev:backend": "npm --workspace backend run dev",
+    "build": "npm --workspace frontend run build && npm --workspace backend run build",
+    "typecheck": "npm --workspace frontend run typecheck && npm --workspace backend run typecheck",
+    "lint": "npm --workspace frontend run lint && npm --workspace backend run lint"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.2"
+  },
+  "engines": {
+    "node": ">=20.10.0"
+  }
+}

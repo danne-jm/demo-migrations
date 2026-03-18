@@ -1,0 +1,50 @@
+{
+  // Codemod playground file for key/value add, rename, remove operations
+  "experiments": {
+    "renameExamples": {
+      "oldApiKeyName": "api_base_url",
+      "newApiKeyName": "apiBaseUrl"
+    },
+    "removeExamples": {
+      "deprecated": {
+        "legacyFeatureA": true,
+        "legacyFeatureB": false
+      },
+      "toDelete": ["old_flag_1", "old_flag_2", "old_flag_3"]
+    },
+    "sortAlphabetically": {
+      "nestedObject": {
+        "zeta": 1,
+        "beta": 2,
+        "alpha": 3,
+        "gamma": {
+          "z": true,
+          "a": false,
+          "m": true
+        }
+      }
+    },
+    "complexStructures": {
+      "matrix": [[1, 2], [3, 4], [5, 6]],
+      "overrides": [
+        {
+          "match": {"env": "dev", "region": "us-east-1"},
+          "set": {"cacheTtlSeconds": 60, "enableVerboseLogs": true}
+        },
+        {
+          "match": {"env": "prod", "region": "eu-west-1"},
+          "set": {"cacheTtlSeconds": 300, "enableVerboseLogs": false}
+        }
+      ]
+    }
+  },
+  "metadata": {
+    "createdBy": "scaffold",
+    "createdAt": "2026-03-18",
+    "notes": [
+      "Try commenting/uncommenting blocks",
+      "Try converting snake_case to camelCase",
+      "Try sorting nestedObject keys alphabetically"
+    ]
+  }
+}

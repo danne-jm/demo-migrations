@@ -1,0 +1,61 @@
+#comby -config codemods/comby/azure-pipeline-mods.toml -f .azure/pipelines/fullstack-ci-cd.yml
+
+[rename-node-version-variable]
+# Renames the nodeVersion variable to nodeJsVersion
+match = '''
+  - name: nodeVersion
+    value: :[val\n]
+'''
+rewrite = '''
+  - name: nodeJsVersion
+    value: :[val\n]
+'''
+
+[remove-dev-environment-var]
+# Removes the deployEnvironmentDev variable block entirely
+match = '''
+  - name: deployEnvironmentDev
+    value: :[val\n]
+'''
+rewrite = ''''''
+
+[add-new-variable]
+# Hooks onto the start of the variables block to insert a new metric port variable
+match = '''
+variables:
+'''
+rewrite = '''
+variables:
+  - name: newMetricPort
+    value: '8080'
+'''
+
+[add-lint-step]
+# Inserts a lint step right after the typecheck in the WorkspaceValidation job
+match = '''
+          - script: npm run typecheck
+            displayName: Typecheck workspace
+            workingDirectory: $(workingDirectory)
+'''
+rewrite = '''
+          - script: npm run typecheck
+            displayName: Typecheck workspace
+            workingDirectory: $(workingDirectory)
+
+          - script: npm run lint
+            displayName: Lint workspace
+            workingDirectory: $(workingDirectory)
+'''
+
+[remove-cache-step]
+# Removes the npm Cache task block completely
+match = '''
+          - task: Cache@2
+            displayName: Cache npm
+            inputs:
+              key: 'npm | "$(Agent.OS)" | package-lock.json'
+              restoreKeys: |
+                npm | "$(Agent.OS)"
+              path: $(Pipeline.Workspace)/.npm
+'''
+rewrite = ''''''
