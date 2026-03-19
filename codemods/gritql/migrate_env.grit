@@ -1,0 +1,35 @@
+engine marzano(0.1)
+language universal
+
+pattern migrate_env() {
+  file(
+    $name,
+    $body
+  ) where {
+    // 1. Dynamic Discovery: Target any file that looks like a .env file
+    $name <: includes ".env",
+    
+    // 2. Sequential Replacements
+    $body <: sequential {
+      // Use (?m)^ to match the start of a line. 
+      // This guarantees we skip `#OLD_API_PORT=8080`
+      contains r"(?m)^OLD_API_PORT=" => `APP_PORT=`,
+      
+      // Standard string replacement
+      contains `NODE_ENV=development` => `NODE_ENV=production`,
+      
+      // Prefix updates for the database
+      contains r"(?m)^DB_USER=" => `DB__USER=`,
+      contains r"(?m)^DB_HOST=" => `DB__HOST=`,
+      contains r"(?m)^DB_PORT=" => `DB__PORT=`,
+      
+      // Commenting out feature toggles
+      contains r"(?m)^DEBUG_MODE=true" => `#DEBUG_MODE=true`
+    },
+
+    // 3. Idempotent Append: Add NEW_KEY if it doesn't already exist
+    if (! $body <: contains `NEW_KEY=true`) {
+      $body => `$body\n\nNEW_KEY=true`
+    }
+  }
+}
