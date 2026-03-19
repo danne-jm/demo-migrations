@@ -1,0 +1,35 @@
+engine marzano(0.1)
+language json
+
+pattern update_package_json() {
+  file(
+    $name,
+    $body
+  ) where {
+    // Global Discovery
+    $name <: includes "package.json",
+    
+    $body <: sequential {
+      
+      // Scenario A: Migrate a dependency
+      contains `"deprecated-library": $_` => `"modern-library": "^3.2.0"`,
+
+      // Scenario B: Update an exact version of a specific package
+      contains `"react": "^17.0.0"` => `"react": "^18.2.0"`,
+
+      // Scenario C: Inject a new script if it doesn't exist
+      // FIXED: Explicitly targeting the `properties` field of the object node
+      contains pair(
+        key = `"scripts"`,
+        value = object(properties = $props)
+      ) where {
+        
+        // Idempotent check: Only inject if the "postupgrade" script isn't already there
+        if (! $props <: contains `"postupgrade": $_`) {
+           // Prepend the new script and keep the existing properties
+           $props => `"postupgrade": "node migrate_env.mjs",\n    $props`
+        }
+      }
+    }
+  }
+}
