@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { getHealth, getPublicConfig, type HealthResponse, type PublicConfigResponse } from './api/client';
 import { JsonPreview } from './components/JsonPreview';
 import { StatusCard } from './components/StatusCard';
+import { HomePage } from './pages/HomePage'; // <-- added import
 
 type LoadState = 'idle' | 'loading' | 'ready' | 'error';
 
@@ -69,6 +70,9 @@ export const App = () => {
           <JsonPreview title="Public config payload" payload={config} />
         </section>
       ) : null}
+
+      {/* Rendering the HomePage component displaying our buttons */}
+      <HomePage />
     </main>
   );
 };

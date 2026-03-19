@@ -1,0 +1,16 @@
+{
+  "name": "fictional-logger",
+  "version": "1.0.0",
+  "description": "A fictional logger package for testing codemods and Renovate",
+  "main": "dist/index.js",
+  "module": "src/index.ts",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc -w",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0"
+  }
+}

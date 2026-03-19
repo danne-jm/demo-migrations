@@ -5,7 +5,8 @@
   "description": "Fullstack TypeScript monorepo with React frontend and Koa backend",
   "workspaces": [
     "frontend",
-    "backend"
+    "backend",
+    "fictional-logger"
   ],
   "scripts": {
     "dev": "concurrently -n frontend,backend -c cyan,magenta \"npm --workspace frontend run dev\" \"npm --workspace backend run dev\"",
