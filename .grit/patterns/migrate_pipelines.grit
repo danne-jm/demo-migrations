@@ -1,0 +1,38 @@
+engine marzano(0.1)
+language yaml
+
+pattern migrate_pipelines() {
+  file(
+    $name,
+    $body
+  ) where {
+    // 1. Dynamic Discovery: Target all YAML files in your Azure pipelines folder
+    $name <: includes ".azure/",
+    
+    // 2. Independent AST-Aware Transformations
+    $body <: contains any {
+      
+      // ---------------------------------------------------------
+      // Scenario A: Rename a complex variable block
+      // Grit natively understands this is a sequence item containing 
+      // a mapping of two keys (name and value). It preserves indentation!
+      // ---------------------------------------------------------
+      `- name: nodeVersion\n  value: $val` => `- name: nodeJsVersion\n  value: $val`,
+
+      // ---------------------------------------------------------
+      // Scenario B: Rename a standard key
+      // This will safely find OLD_REGION anywhere in the AST tree
+      // and swap the key while keeping whatever value was assigned to it.
+      // ---------------------------------------------------------
+      `OLD_REGION: $val` => `PRIMARY_REGION: $val`,
+
+      // ---------------------------------------------------------
+      // Scenario C: Safely delete deprecated flags
+      // The `.` syntax is Grit's delete operator. It removes the 
+      // entire key-value pair from the AST without leaving empty lines.
+      // ---------------------------------------------------------
+      `DEPRECATED_FLAG: $_` => .
+      
+    }
+  }
+}
