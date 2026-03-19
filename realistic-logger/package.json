@@ -1,0 +1,16 @@
+{
+  "name": "realistic-logger",
+  "version": "1.0.0",
+  "description": "A realistic logger package for modern applications",
+  "main": "dist/index.js",
+  "module": "src/index.ts",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc -w",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0"
+  }
+}
