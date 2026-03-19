@@ -9,6 +9,7 @@
     "types": ["vite/client", "node"],
     "allowJs": false,
     "composite": true,
+    "outDir": "./dist",
     "baseUrl": "./src"
   },
   "include": ["src", "vite.config.ts"]

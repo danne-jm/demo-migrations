@@ -16,8 +16,8 @@ export const HomePage = () => {
       <p>This component traverses several layers to find the original `logging()` function from the fictional package.</p>
       
       <div style={{ marginTop: '2rem' }}>
-        <TrackEventButton label="Fire Event Action" />
-        <DirectLogButton label="Fire Base Log Action" />
+        <TrackEventButton label="Fire Fictional Logger" />
+        <DirectLogButton label="Fire Real Logger Action" />
       </div>
     </div>
   );
