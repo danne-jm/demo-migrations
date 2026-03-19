@@ -6,30 +6,38 @@ pattern update_package_json() {
     $name,
     $body
   ) where {
-    // Global Discovery
+    // Only target package.json files
     $name <: includes "package.json",
     
-    $body <: sequential {
+    // Execute any of the matches independently
+    $body <: contains any {
       
-      // Scenario A: Migrate a dependency
-      contains `"deprecated-library": $_` => `"modern-library": "^3.2.0"`,
+      // ---------------------------------------------------------
+      // Scenario 1: Workspaces Array-to-Object Migration
+      // Pure snippet matching: Grit understands this is a JSON pair 
+      // containing an array.
+      // ---------------------------------------------------------
+      `"workspaces": [ $elements ]` => `"workspaces": {\n    "packages": [\n      $elements\n    ]\n  }`,
 
-      // Scenario B: Update an exact version of a specific package
-      contains `"react": "^17.0.0"` => `"react": "^18.2.0"`,
-
-      // Scenario C: Inject a new script if it doesn't exist
-      // FIXED: Explicitly targeting the `properties` field of the object node
-      contains pair(
-        key = `"scripts"`,
-        value = object(properties = $props)
-      ) where {
-        
-        // Idempotent check: Only inject if the "postupgrade" script isn't already there
-        if (! $props <: contains `"postupgrade": $_`) {
-           // Prepend the new script and keep the existing properties
-           $props => `"postupgrade": "node migrate_env.mjs",\n    $props`
+      // ---------------------------------------------------------
+      // Scenario 2: Dynamic Dependency Upgrades
+      // $_ acts as a wildcard matching whatever the current version is.
+      // ---------------------------------------------------------
+      `"react": $_` => `"react": "^18.2.0"`,
+      `"react-dom": $_` => `"react-dom": "^18.2.0"`,
+      `"koa": $_` => `"koa": "^2.14.0"`,
+      
+      // ---------------------------------------------------------
+      // Scenario 3: Safely Injecting Scripts
+      // $props captures all existing key-value pairs inside "scripts"
+      // ---------------------------------------------------------
+      `"scripts": { $props }` where {
+        // Idempotency: Only add lint if it doesn't exist in the captured props
+        if (! $props <: contains `"lint": $_`) {
+           $props => `"lint": "eslint src --ext .ts,.tsx",\n    $props`
         }
       }
+
     }
   }
 }
