@@ -1,25 +1,31 @@
 engine marzano(0.1)
 language yaml
 
-pattern add_codeql() {
-  `- task: AzureCLI@2
-  displayName: Deploy backend artifact
-  inputs: $i` as $item => `- task: AdvancedSecurity-Codeql-Init@1
-  displayName: 'Initialize CodeQL'
-  inputs:
-    languages: 'javascript'
-$item`
+function manipulate_blocks($body) js {
+  let text = $body.text ?? $body;
+  
+  // 1. Remove Any CopyFiles@2 block
+  // Match `- task: CopyFiles@2` and all following indented lines
+  text = text.replace(/^[ \t]*- task: CopyFiles@2\r?\n(?:[ \t]+(?![ \t]*- task:).*\r?\n)*/gm, '');
+
+  // 2. Inject CodeQL security scan step before any step containing "Deploy"
+  const codeqlBlock = `- task: AdvancedSecurity-Codeql-Init@1\n  inputs:\n    languages: 'javascript, typescript'`;
+
+  if (!text.includes('AdvancedSecurity-Codeql-Init@1')) {
+    text = text.replace(/^([ \t]*)- task:[^\n]+\r?\n(?:[ \t]*)[^\n]*[Dd]eploy[^\n]*\r?\n/gm, (match, indent) => {
+      const injected = codeqlBlock.split('\n').map((line, i) => i === 0 ? indent + line : indent + line).join('\n');
+      return `${injected}\n\n${match}`;
+    });
+  }
+
+  return text;
 }
 
-pattern remove_copyfiles() {
-  `- task: CopyFiles@2
-  displayName: $d
-  inputs: $i` => .
-}
-
-multifile {
-  $body where {
-    $body <: contains add_codeql(),
-    $body <: maybe contains remove_copyfiles()
+pattern scenario_three() {
+  file($name, $body) where {
+    $name <: includes ".azure/templates/deploy/deploy-backend.yml",
+    $body => manipulate_blocks($body)
   }
 }
+
+scenario_three()
