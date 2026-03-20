@@ -1,30 +1,49 @@
+// ## Scenario 3: Block Manipulation (Targets Specific Deploy Templates)
+// Testing the codemod's structural awareness: injecting, replacing, and stripping whole nested YAML nodes in specific module templates.
+// 
+// ### Expected Transformations:
+// 1. **Targeting:** Run *only* on `.azure/templates/deploy/deploy-backend.yml`.
+// 2. **Add entire YAML Block (Security Scan Step):**
+//    - Inject a new security scanning step *before* any step containing the word "Deploy":
+//      ```yaml
+//      - task: AdvancedSecurity-Codeql-Init@1
+//     inputs:
+//          languages: 'javascript, typescript'
+//      ```
+// 3. **Remove YAML Block:** 
+//    - Find any step that references a deprecated task (e.g., `task: CopyFiles@2`) and delete the entire block, including its `inputs:` and any conditional `condition:` or `displayName:` sub-properties automatically.
+
 engine marzano(0.1)
 language yaml
-
-function manipulate_blocks($body) js {
-  let text = $body.text ?? $body;
-  
-  // 1. Remove Any CopyFiles@2 block
-  // Match `- task: CopyFiles@2` and all following indented lines
-  text = text.replace(/^[ \t]*- task: CopyFiles@2\r?\n(?:[ \t]+(?![ \t]*- task:).*\r?\n)*/gm, '');
-
-  // 2. Inject CodeQL security scan step before any step containing "Deploy"
-  const codeqlBlock = `- task: AdvancedSecurity-Codeql-Init@1\n  inputs:\n    languages: 'javascript, typescript'`;
-
-  if (!text.includes('AdvancedSecurity-Codeql-Init@1')) {
-    text = text.replace(/^([ \t]*)- task:[^\n]+\r?\n(?:[ \t]*)[^\n]*[Dd]eploy[^\n]*\r?\n/gm, (match, indent) => {
-      const injected = codeqlBlock.split('\n').map((line, i) => i === 0 ? indent + line : indent + line).join('\n');
-      return `${injected}\n\n${match}`;
-    });
-  }
-
-  return text;
-}
 
 pattern scenario_three() {
   file($name, $body) where {
     $name <: includes ".azure/templates/deploy/deploy-backend.yml",
-    $body => manipulate_blocks($body)
+    
+    // 1. ONLY target the values inside a "steps:" block
+    $body <: contains block_mapping_pair(
+      key = $steps_key,
+      value = $steps_value
+    ) where {
+      $steps_key <: "steps",
+      
+      // RULE A: Safely remove the CopyFiles@2 task
+      $steps_value <: contains block_sequence_item() as $item1 where {
+        $item1 <: contains "CopyFiles@2"
+      } => .,
+
+      // RULE B: Inject CodeQL before any Deploy step
+      $steps_value <: contains block_sequence_item() as $item2 where {
+        // FIX: Use AST contains + regex to search inside the node!
+        $item2 <: contains r"Deploy|deploy",
+        
+        // Idempotency: Make sure it isn't already injected
+        $body <: not contains "AdvancedSecurity-Codeql-Init@1"
+      } => `- task: AdvancedSecurity-Codeql-Init@1
+  inputs:
+    languages: 'javascript, typescript'
+$item2`
+    }
   }
 }
 

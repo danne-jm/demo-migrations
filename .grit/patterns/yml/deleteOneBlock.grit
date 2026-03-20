@@ -1,0 +1,44 @@
+engine marzano(0.1)
+language yaml
+
+pattern scenario_three() {
+  file($name, $body) where {
+    $name <: includes ".azure/templates/deploy/deploy-backend.yml",
+    
+    // 1. Check globally if we need CodeQL
+    $needs_codeql = false,
+    if ($body <: not contains "AdvancedSecurity-Codeql-Init@1") {
+      $needs_codeql = true
+    },
+
+    // 2. ONLY target the values inside a "steps:" block
+    // FIX: Using '=' for AST field matching
+    $body <: contains block_mapping_pair(
+      key = $steps_key,
+      value = $steps_value
+    ) where {
+      // Ensure we are inside 'steps:'
+      $steps_key <: "steps",
+      
+      // 3. Now search for the sequence items (the individual steps)
+      $steps_value <: contains or {
+        
+        // RULE A: Safely remove the CopyFiles@2 task
+        block_sequence_item() as $item where {
+          $item <: contains "CopyFiles@2"
+        } => .,
+
+        // RULE B: Inject CodeQL before ANY step containing Deploy/deploy
+        block_sequence_item() as $item where {
+          $needs_codeql <: true,
+          $item <: contains or { "Deploy", "deploy" }
+        } => `- task: AdvancedSecurity-Codeql-Init@1
+  inputs:
+    languages: 'javascript, typescript'
+$item`
+      }
+    }
+  }
+}
+
+scenario_three()

@@ -20,58 +20,66 @@
 engine marzano(0.1)
 language yaml
 
+// Safely replace interior variable usages within long strings or scripts
+function rename_usages($val) js {
+    let text = $val.text;
+    if (!text.includes('ENVIRONMENT')) return text;
+    
+    // Safely replace usages: $(ENVIRONMENT), ${{ variables.ENVIRONMENT }}, etc.
+    text = text.replace(/\$\(ENVIRONMENT\)/g, '$(AZ_ENV)');
+    text = text.replace(/variables\.ENVIRONMENT/g, 'variables.AZ_ENV');
+    text = text.replace(/\$\{\{\s*ENVIRONMENT\s*\}\}/g, '${{ AZ_ENV }}');
+    
+    return text;
+}
+
 pattern scenario_one() {
   file($name, $body) where {
-    // Scope to common Azure pipeline locations to avoid unrelated YAML/fixtures
-    or {
-      $name <: includes ".azure/",
-      $name <: includes "azure-pipelines",
-      $name <: includes "/pipelines/"
-    },
+    // Scope to pipeline files
+    $name <: includes or { ".azure/", "azure-pipelines", "/pipelines/" },
     $name <: not includes "/fixtures/",
-    $body <: contains any {
-      // Case A: variables block as key-value mapping
-      block_mapping_pair(key=`variables`, value=block_node(map=$vars)) =>
-        `variables:
-  AZURE_SUBSCRIPTION: "sp-main-production"
-  $vars` where {
-          $vars <: not contains block_sequence_item(item=$_),
-          $vars <: not contains `AZURE_SUBSCRIPTION`
-        },
 
-      // Case B: variables block as sequence of name/value objects
-      block_mapping_pair(key=`variables`, value=block_node(map=$vars)) =>
-        `variables:
-  - name: AZURE_SUBSCRIPTION
-    value: "sp-main-production"
-  $vars` where {
-          $vars <: contains block_sequence_item(item=$_),
-          $vars <: not contains `AZURE_SUBSCRIPTION`
-        },
+    // RULE 1: Completely delete NODE_ENV (Done first to prevent mutations later)
+    $body <: contains or {
+      // Matches Mapping: `NODE_ENV: 'production'`
+      block_mapping_pair(key = "NODE_ENV") => .,
+      
+      // Matches Sequence: `- name: NODE_ENV`
+      block_sequence_item() as $item where {
+        $item <: contains block_mapping_pair(key = "name", value = "NODE_ENV")
+      } => .
+    },
 
-      // Fallback sequence insertion (textual) in case AST match fails
-      `variables:
-  $vars` => `variables:
-  - name: AZURE_SUBSCRIPTION
-    value: "sp-main-production"
-  $vars` where {
-        $vars <: not contains `AZURE_SUBSCRIPTION`
-      },
+    // RULE 2: Rename ENVIRONMENT definitions
+    $body <: contains or {
+      // Matches Mapping: `ENVIRONMENT: 'dev'`
+      block_mapping_pair(key = "ENVIRONMENT", value = $v) => `AZ_ENV: $v`,
+      
+      // Matches Sequence: `- name: ENVIRONMENT`
+      block_mapping_pair(key = "name", value = "ENVIRONMENT") => `name: AZ_ENV`
+    },
 
+    // RULE 3: Rename inline string usages of ENVIRONMENT
+    // flow_node() catches any scalar value/string in the YAML file
+    $body <: contains flow_node() as $node where {
+        $node <: includes "ENVIRONMENT",
+        $node => rename_usages(val = $node)
+    },
 
-      // Rename variable definitions
-      `ENVIRONMENT: $val` => `AZ_ENV: $val`,
-      `name: ENVIRONMENT` => `name: AZ_ENV`,
-
-      // Rename usages
-      `variables.ENVIRONMENT` => `variables.AZ_ENV`,
-      `$(ENVIRONMENT)` => `$(AZ_ENV)`,
-      `${{ variables.ENVIRONMENT }}` => `${{ variables.AZ_ENV }}`,
-      `${{ ENVIRONMENT }}` => `${{ AZ_ENV }}`,
-
-      // Remove NODE_ENV definitions
-      `NODE_ENV: $_` => .,
-      block_sequence_item(item=contains `name: NODE_ENV`) => .
+    // RULE 4: Inject AZURE_SUBSCRIPTION into variables blocks globally
+    $body <: contains block_mapping_pair(key = "variables", value = $vars) where {
+      // Idempotency check
+      $vars <: not contains "AZURE_SUBSCRIPTION",
+      
+      // Duck-type the AST: If it contains list items, it's an array!
+      if ($vars <: contains block_sequence_item()) {
+        $vars => `- name: AZURE_SUBSCRIPTION
+  value: 'sp-main-production'
+$vars`
+      } else {
+        $vars => `AZURE_SUBSCRIPTION: 'sp-main-production'
+$vars`
+      }
     }
   }
 }

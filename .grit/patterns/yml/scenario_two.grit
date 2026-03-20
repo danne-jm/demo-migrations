@@ -17,55 +17,60 @@
 //    - Change instances of `task: NodeTool@0` to `task: UseNode@1` and simultaneously update its nested input `versionSpec: '16.x'` to `version: '20.x'`.
 // 
 // ---
-
 engine marzano(0.1)
 language yaml
 
-function inject_audit_line($block) js {
-	const text = $block.text ?? $block;
-	if (text.includes('npm audit fix --audit-level=high')) return text;
-
-	const patched = text.replace(/npm install[^\S\r\n]*\n([ \t]*)npm build/, (match, indent) => {
-		const space = indent || '';
-		return `npm install\n${space}npm audit fix --audit-level=high\n${space}npm build`;
-	});
-
-	// Preserve or introduce indentation for block scalar content
-	const baseIndentMatch = patched.match(/^(\s+)/m);
-	const baseIndent = baseIndentMatch ? '' : '';
-
-	return patched
-		.split('\n')
-		.map(line => {
-			if (!line.trim()) return line;
-			return line.trimStart();
-		})
-		.join('\n');
+// 1. JavaScript function to safely patch the interior of the script string
+function inject_audit_line($val) js {
+    // $val.text gives us the raw text of the AST node, preserving existing indents/newlines
+    let text = $val.text;
+    
+    // Idempotency check
+    if (text.includes('npm audit fix --audit-level=high')) {
+        return text;
+    }
+    
+    // Match `npm install` -> newline -> (capture indent) -> `npm build`
+    const regex = /(npm install[^\S\r\n]*\n)([ \t]*)(npm build)/g;
+    
+    // Inject the new line, reusing the exact indentation captured in $2
+    return text.replace(regex, "$1$2npm audit fix --audit-level=high\n$2$3");
 }
 
 pattern scenario_two() {
-	file($name, $body) where {
-		$name <: includes ".azure/pipelines/fullstack-ci-cd.yml",
-		$body <: contains `task: NodeTool@0` => `task: UseNode@1`,
-		$body <: contains `versionSpec: '16.x'` => `version: '20.x'`,
-		$body <: maybe contains `script: |
-              npm install
-              npm build` => `script: |
-              npm install
-              npm audit fix --audit-level=high
-              npm build`,
-	}
+    file($name, $body) where {
+        // Target constraint
+        $name <: includes ".azure/pipelines/fullstack-ci-cd.yml",
+
+        // Traverse the AST and apply independent rules
+        $body <: contains or {
+            
+            // RULE A: Scoped Task Modification
+            // Find a specific block mapping (a task block)
+            block_mapping() as $task_block where {
+                // Verify this block is specifically the NodeTool@0 task
+                $task_block <: contains block_mapping_pair(key = "task", value = "NodeTool@0"),
+                
+                // 1. Change the task name
+                $task_block <: contains block_mapping_pair(key = "task", value = $t_val) where {
+                    $t_val => `UseNode@1`
+                },
+                // 2. Change the version property (replacing the whole key-value pair)
+                $task_block <: contains block_mapping_pair(key = "versionSpec") as $v_pair where {
+                    $v_pair => `version: '20.x'`
+                }
+            },
+
+            // RULE B: Inline Script Patching
+            // Find the "script" key and isolate its value
+            block_mapping_pair(key = "script", value = $script_val) where {
+                $script_val <: includes "npm install",
+                $script_val <: includes "npm build",
+                // Pass the isolated string node to our JS regex function
+                $script_val => inject_audit_line(val = $script_val)
+            }
+        }
+    }
 }
 
 scenario_two()
- 
-pattern scenario_two_cleanup() {
-	file($name, $body) where {
-		$name <: includes ".azure/pipelines/fullstack-ci-cd.yml",
-		$body <: maybe contains `                          npm install` => `              npm install`,
-		$body <: maybe contains `                          npm audit fix --audit-level=high` => `              npm audit fix --audit-level=high`,
-		$body <: maybe contains `                          npm build` => `              npm build`
-	}
-}
-
-scenario_two_cleanup()
