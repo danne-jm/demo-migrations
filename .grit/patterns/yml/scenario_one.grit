@@ -1,3 +1,22 @@
+// ## Overview of Targets
+// The workspace pipeline structure:
+// - `.azure/pipelines/fullstack-ci-cd.yml` (Main pipeline)
+// - `.azure/templates/deploy/deploy-backend.yml` (Backend deploy template)
+// - `.azure/templates/deploy/deploy-frontend.yml` (Frontend deploy template)
+// 
+// ## Scenario 1: Variable Manipulations (Targets ALL YAML files)
+// This scenario ensures the codemod engine can intelligently traverse and apply changes to variable blocks globally, handling both mapping scalars and sequence elements.
+// 
+// ### Expected Transformations:
+// 1. **Add new variables:** 
+//    - Add `AZURE_SUBSCRIPTION: "sp-main-production"` to every file's `variables` block globally.
+// 2. **Rename variables:** 
+//    - Rename any occurrence of the variable `ENVIRONMENT` to `AZ_ENV` globally, both in the definition and in usage (`${{ variables.ENVIRONMENT }}` to `${{ variables.AZ_ENV }}` or `$(ENVIRONMENT)` to `$(AZ_ENV)`).
+// 3. **Remove variables:** 
+//    - Completely delete the `NODE_ENV` variable definition from any place where it is defined.
+// 
+// ---
+
 engine marzano(0.1)
 language yaml
 
@@ -12,16 +31,33 @@ pattern scenario_one() {
     $name <: not includes "/fixtures/",
     $body <: contains any {
       // Case A: variables block as key-value mapping
-  `variables: $vars` => `variables:\n  AZURE_SUBSCRIPTION: "sp-main-production"\n  $vars` where {
-        $vars <: not contains block_sequence_item(item=$_),
+      block_mapping_pair(key=`variables`, value=block_node(map=$vars)) =>
+        `variables:
+  AZURE_SUBSCRIPTION: "sp-main-production"
+  $vars` where {
+          $vars <: not contains block_sequence_item(item=$_),
+          $vars <: not contains `AZURE_SUBSCRIPTION`
+        },
+
+      // Case B: variables block as sequence of name/value objects
+      block_mapping_pair(key=`variables`, value=block_node(map=$vars)) =>
+        `variables:
+  - name: AZURE_SUBSCRIPTION
+    value: "sp-main-production"
+  $vars` where {
+          $vars <: contains block_sequence_item(item=$_),
+          $vars <: not contains `AZURE_SUBSCRIPTION`
+        },
+
+      // Fallback sequence insertion (textual) in case AST match fails
+      `variables:
+  $vars` => `variables:
+  - name: AZURE_SUBSCRIPTION
+    value: "sp-main-production"
+  $vars` where {
         $vars <: not contains `AZURE_SUBSCRIPTION`
       },
 
-      // Case B: variables block as sequence of name/value objects
-  `variables: $vars` => `variables:\n  - name: AZURE_SUBSCRIPTION\n    value: "sp-main-production"\n  $vars` where {
-        $vars <: contains block_sequence_item(item=$_),
-        $vars <: not contains `AZURE_SUBSCRIPTION`
-      },
 
       // Rename variable definitions
       `ENVIRONMENT: $val` => `AZ_ENV: $val`,
