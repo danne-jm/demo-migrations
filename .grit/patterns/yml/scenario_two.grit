@@ -1,0 +1,71 @@
+// ## Overview of Targets
+// The workspace pipeline structure:
+// - `.azure/pipelines/fullstack-ci-cd.yml` (Main pipeline)
+// - `.azure/templates/deploy/deploy-backend.yml` (Backend deploy template)
+// - `.azure/templates/deploy/deploy-frontend.yml` (Frontend deploy template)
+// 
+// ## Scenario 2: Inline Step Modifications (Targets strictly the Main Pipeline)
+// Testing the ability to scope modifications strictly to a single pipeline file (e.g., `fullstack-ci-cd.yml`) and alter properties deeply within strings without overwriting the entire script block.
+//
+// ### Expected Transformations:
+// 1. **Targeting:** Run *only* on `.azure/pipelines/fullstack-ci-cd.yml`.
+// 2. **Modify Single Lines in Multi-line Scripts:** 
+//    - Inside a `script:` block that currently runs an `npm install` and `npm build`, inject an additional line exactly between those two commands:
+//      - `npm audit fix --audit-level=high`
+//    - *Constraint:* Do not replace the existing script string completely; utilize regex or string manipulation functions to patch the interior.
+// 3. **Modify Tasks:**
+//    - Change instances of `task: NodeTool@0` to `task: UseNode@1` and simultaneously update its nested input `versionSpec: '16.x'` to `version: '20.x'`.
+// 
+// ---
+
+engine marzano(0.1)
+language yaml
+
+function inject_audit_line($block) js {
+	const text = $block.text ?? $block;
+	if (text.includes('npm audit fix --audit-level=high')) return text;
+
+	const patched = text.replace(/npm install[^\S\r\n]*\n([ \t]*)npm build/, (match, indent) => {
+		const space = indent || '';
+		return `npm install\n${space}npm audit fix --audit-level=high\n${space}npm build`;
+	});
+
+	// Preserve or introduce indentation for block scalar content
+	const baseIndentMatch = patched.match(/^(\s+)/m);
+	const baseIndent = baseIndentMatch ? '' : '';
+
+	return patched
+		.split('\n')
+		.map(line => {
+			if (!line.trim()) return line;
+			return line.trimStart();
+		})
+		.join('\n');
+}
+
+pattern scenario_two() {
+	file($name, $body) where {
+		$name <: includes ".azure/pipelines/fullstack-ci-cd.yml",
+		$body <: contains `task: NodeTool@0` => `task: UseNode@1`,
+		$body <: contains `versionSpec: '16.x'` => `version: '20.x'`,
+		$body <: maybe contains `script: |
+              npm install
+              npm build` => `script: |
+              npm install
+              npm audit fix --audit-level=high
+              npm build`,
+	}
+}
+
+scenario_two()
+ 
+pattern scenario_two_cleanup() {
+	file($name, $body) where {
+		$name <: includes ".azure/pipelines/fullstack-ci-cd.yml",
+		$body <: maybe contains `                          npm install` => `              npm install`,
+		$body <: maybe contains `                          npm audit fix --audit-level=high` => `              npm audit fix --audit-level=high`,
+		$body <: maybe contains `                          npm build` => `              npm build`
+	}
+}
+
+scenario_two_cleanup()

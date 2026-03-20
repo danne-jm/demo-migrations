@@ -1,0 +1,25 @@
+engine marzano(0.1)
+language yaml
+
+pattern add_codeql() {
+  `- task: AzureCLI@2
+  displayName: Deploy backend artifact
+  inputs: $i` as $item => `- task: AdvancedSecurity-Codeql-Init@1
+  displayName: 'Initialize CodeQL'
+  inputs:
+    languages: 'javascript'
+$item`
+}
+
+pattern remove_copyfiles() {
+  `- task: CopyFiles@2
+  displayName: $d
+  inputs: $i` => .
+}
+
+multifile {
+  $body where {
+    $body <: contains add_codeql(),
+    $body <: maybe contains remove_copyfiles()
+  }
+}
