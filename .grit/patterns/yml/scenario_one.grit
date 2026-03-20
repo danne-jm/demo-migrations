@@ -1,0 +1,43 @@
+engine marzano(0.1)
+language yaml
+
+pattern scenario_one() {
+  file($name, $body) where {
+    // Scope to common Azure pipeline locations to avoid unrelated YAML/fixtures
+    or {
+      $name <: includes ".azure/",
+      $name <: includes "azure-pipelines",
+      $name <: includes "/pipelines/"
+    },
+    $name <: not includes "/fixtures/",
+    $body <: contains any {
+      // Case A: variables block as key-value mapping
+  `variables: $vars` => `variables:\n  AZURE_SUBSCRIPTION: "sp-main-production"\n  $vars` where {
+        $vars <: not contains block_sequence_item(item=$_),
+        $vars <: not contains `AZURE_SUBSCRIPTION`
+      },
+
+      // Case B: variables block as sequence of name/value objects
+  `variables: $vars` => `variables:\n  - name: AZURE_SUBSCRIPTION\n    value: "sp-main-production"\n  $vars` where {
+        $vars <: contains block_sequence_item(item=$_),
+        $vars <: not contains `AZURE_SUBSCRIPTION`
+      },
+
+      // Rename variable definitions
+      `ENVIRONMENT: $val` => `AZ_ENV: $val`,
+      `name: ENVIRONMENT` => `name: AZ_ENV`,
+
+      // Rename usages
+      `variables.ENVIRONMENT` => `variables.AZ_ENV`,
+      `$(ENVIRONMENT)` => `$(AZ_ENV)`,
+      `${{ variables.ENVIRONMENT }}` => `${{ variables.AZ_ENV }}`,
+      `${{ ENVIRONMENT }}` => `${{ AZ_ENV }}`,
+
+      // Remove NODE_ENV definitions
+      `NODE_ENV: $_` => .,
+      block_sequence_item(item=contains `name: NODE_ENV`) => .
+    }
+  }
+}
+
+scenario_one()
