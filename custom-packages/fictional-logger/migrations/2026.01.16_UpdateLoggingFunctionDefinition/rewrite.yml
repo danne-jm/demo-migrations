@@ -6,8 +6,4 @@ description: >
   Updates imports and function calls for the fictional-logger v2 update.
 
 recipeList:
-  - org.openrewrite.javascript.change-import:
-      oldModule: "@danieljaurellmevorach/fictional-logger"
-      oldMember: "logging"
-      newModule: "@danieljaurellmevorach/fictional-logger"
-      newMember: "logV2"
+  - com.yourorg.UpdateFictionalLogger
