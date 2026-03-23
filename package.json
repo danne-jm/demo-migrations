@@ -6,7 +6,8 @@
   "workspaces": [
     "frontend",
     "backend",
-    "custom-packages/realistic-logger"
+    "custom-packages/realistic-logger",
+    "custom-packages/fictional-logger"
   ],
   "scripts": {
     "dev": "concurrently -n frontend,backend -c cyan,magenta \"npm --workspace frontend run dev\" \"npm --workspace backend run dev\"",
