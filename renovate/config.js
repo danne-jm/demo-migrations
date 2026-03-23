@@ -50,6 +50,14 @@ module.exports = {
         matchFileNames: ["Dockerfile", "docker-compose.yml"],  
         enabled: false  
       },
-    ]
-    
+    ],
+  
+  allowedPostUpgradeCommands: [".*"],
+  postUpgradeTasks: {
+    commands: [
+       "WORKSPACE_DIR={{{repositoryPath}}} RENOVATE_UPDATED_PACKAGE={{{depName}}} RENOVATE_OLD_VERSION={{{currentVersion}}} RENOVATE_NEW_VERSION={{{newVersion}}} bash renovate/scripts/post-upgrade.sh"
+    ],
+    fileFilters: ["**/*.ts", "**/*.tsx", "**/*.js", "**/*.jsx", "**/*.json"],
+    executionMode: "branch"
+  }
 };

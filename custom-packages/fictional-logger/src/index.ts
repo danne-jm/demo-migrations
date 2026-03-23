@@ -1,8 +1,8 @@
 /**
  * Fictional Logger implementation
- * Exports a `logging` function to be used across the monorepo.
+ * Exports a `logV2` function to be used across the monorepo.
  */
-export const logging = (message: string, ...args: any[]): void => {
+export const logV2 = (message: string, ...args: any[]): void => {
   const timestamp = new Date().toISOString();
-  console.log(`[fictional-logger@1.0.0] ${timestamp} - ${message}`, ...args);
+  console.log(`[fictional-logger@2.1.0] V2 LOG ${timestamp} - ${message}`, ...args);
 };

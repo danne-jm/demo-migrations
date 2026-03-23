@@ -1,9 +1,0 @@
-[
-    {
-        "version": "2.0.0",
-        "description": "Renamed logging function.",
-        "migrationFiles": [
-            "migrations/2026.01.16_UpdateLoggingFunctionDefinition/script.yml"
-        ]
-    }
-]

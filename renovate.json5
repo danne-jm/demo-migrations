@@ -12,7 +12,7 @@
 
   "packageRules": [  
       {  
-        "matchFileNames": ["**/realistic-logger/**", "**/renovate/**", "**/gritql/**", "**/fictional-logger/**"],  
+        "matchFileNames": ["**/custom-packages/**", "**/renovate/**", "**/gritql/**"],  
         "enabled": false  
       }
     ]

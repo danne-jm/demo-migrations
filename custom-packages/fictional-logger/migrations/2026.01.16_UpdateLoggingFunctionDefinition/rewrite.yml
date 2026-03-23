@@ -1,17 +1,13 @@
 ---
 type: specs.openrewrite.org/v1beta/recipe
-name: com.yourorg.FullAppMigration
-displayName: Full Application V2 Migration
+name: com.belfius.FictionalLoggerV2
+displayName: Fictional Logger V2 Migration
 description: >
-  Renames getAllProducts → getAllSellables everywhere (defs, calls, imports)
-  and updates its parameter list to the new signature:
-    getAllSellables(option, token = 404, seed)
+  Updates imports and function calls for the fictional-logger v2 update.
 
 recipeList:
-  - com.yourorg.updateLoggingDefinition:
-      oldName: getAllProducts
-      newName: getAllSellables
-      target: all
-  - org.openrewrite.javascript.change-import:
-      oldImport: "com.yourorg.getAllProducts"
-      newImport: "com.yourorg.getAllSellables"
+  - com.yourorg.UpdateFictionalLogger
+  - org.openrewrite.javascript.ChangeImport:
+      oldImport: "logging"
+      newImport: "logV2"
+      packageName: "@danieljaurellmevorach/fictional-logger"

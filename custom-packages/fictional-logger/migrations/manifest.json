@@ -1,9 +1,23 @@
 [
     {
-        "version": "2.0.0",
+        "version": "0.8.0",
+        "description": "Legacy rename.",
+        "migrationFiles": [
+            "2025.10.10_LegacyMigration/rewrite.yml"
+        ]
+    },
+    {
+        "version": "0.9.0",
+        "description": "Pre-v1 cleanups.",
+        "migrationFiles": [
+            "2025.11.12_PreV1Cleanup/rewrite.yml"
+        ]
+    },
+    {
+        "version": "2.1.0",
         "description": "Renamed logging function.",
         "migrationFiles": [
-            "migrations/2026.01.16_UpdateLoggingFunctionDefinition/script.yml"
+            "2026.01.16_UpdateLoggingFunctionDefinition/rewrite.yml"
         ]
     }
 ]
