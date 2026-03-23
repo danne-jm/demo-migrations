@@ -36,12 +36,8 @@
       "groupSlug": "other-minor-patch",  
       "matchDatasources": ["npm"],
       "allowedVersions": ">=current",
-    },  
-    {
-      "groupName": "workspace-packages",
-      "enabled": true
     }
-    
-  ],
+  ]
+}
 
 }
