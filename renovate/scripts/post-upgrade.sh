@@ -8,7 +8,7 @@ set -e
 # RENOVATE_UPDATED_PACKAGE: Name of the package that was updated
 # RENOVATE_OLD_VERSION: The previously installed version
 # RENOVATE_NEW_VERSION: The newly updated version
-# WORKSPACE_DIR: The root of the repository
+# WORKSPACE_DIR: The root of the repository (Note: can be empty in some Renovate configs)
 
 echo "Running post-upgrade tasks for $RENOVATE_UPDATED_PACKAGE from $RENOVATE_OLD_VERSION to $RENOVATE_NEW_VERSION"
 
@@ -17,10 +17,6 @@ git remote set-url origin https://github.com/danne-jm/demo-migrations.git || tru
 
 # We assume standard node_modules structure, or local custom-packages structure
 # Let's search for migrations directory in the package that was just bumped
-
-# Since RENOVATE_UPDATED_PACKAGE can contain multiple packages separated by space,
-# let's process them properly if needed. For now, let's just use the first package in the list that has a migrations directory,
-# or loop through them all.
 
 FOUND_MIGRATIONS=false
 
@@ -110,42 +106,53 @@ fi
 
 echo "Executing migrations: $MIGRATIONS_TO_RUN"
 
+# Ensure we are operating out of the root directory.
+# If WORKSPACE_DIR is empty, fallback to the current directory (`.`).
+cd "${WORKSPACE_DIR:-.}"
+
+# Install all yaml recipes first before building AST
+for MIGRATION_FILE in $MIGRATIONS_TO_RUN; do
+    # Use relative pathing instead of absolute pathing
+    migration_path="$MIGRATIONS_DIR/$MIGRATION_FILE"
+    
+    if [ ! -f "$migration_path" ]; then
+        echo "Migration file $migration_path not found! Skipping install..."
+        continue
+    fi
+    
+    echo "Installing recipe: $migration_path"
+    mod config recipes yaml install "$migration_path"
+done
+
 # Build LST for the current repository using Moderne CLI
 echo "Building ASTs for current repository..."
-cd "$WORKSPACE_DIR"
 mod build .
 
 for MIGRATION_FILE in $MIGRATIONS_TO_RUN; do
     echo "Processing migration file: $MIGRATION_FILE"
     
-    # Absolute path to the migration config file (YML)
-    abs_migration_path="$WORKSPACE_DIR/$MIGRATIONS_DIR/$MIGRATION_FILE"
+    # Use relative pathing instead of absolute pathing
+    migration_path="$MIGRATIONS_DIR/$MIGRATION_FILE"
     
-    if [ ! -f "$abs_migration_path" ]; then
-        echo "Migration file $abs_migration_path not found! Skipping..."
+    if [ ! -f "$migration_path" ]; then
+        echo "Migration file $migration_path not found! Skipping..."
         continue
     fi
 
     # Extract the recipe name from the YAML file
     # Assumes the format `name: com.example.RecipeName` on its own line
-    RECIPE_NAME=$(grep '^name:' "$abs_migration_path" | head -n 1 | awk '{print $2}' | tr -d '"' | tr -d "'")
+    RECIPE_NAME=$(grep '^name:' "$migration_path" | head -n 1 | awk '{print $2}' | tr -d '"' | tr -d "'")
 
     if [ -z "$RECIPE_NAME" ]; then
-        echo "Could not extract recipe 'name:' from $abs_migration_path. Skipping..."
+        echo "Could not extract recipe 'name:' from $migration_path. Skipping..."
         continue
     fi
-
-    # Copy the migration YAML to the root directory so Moderne CLI can discover it
-    cp "$abs_migration_path" "rewrite.yml"
 
     echo "Running recipe: $RECIPE_NAME"
     mod run . --recipe="$RECIPE_NAME"
 
     echo "Applying changes for $RECIPE_NAME"
     mod git apply . --last-recipe-run
-    
-    # Optional clean up the temporary rewrite.yml
-    rm -f rewrite.yml
     
     echo "Migration $MIGRATION_FILE executed successfully."
 done
