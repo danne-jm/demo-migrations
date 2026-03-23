@@ -17,17 +17,48 @@ git remote set-url origin https://github.com/danne-jm/demo-migrations.git || tru
 
 # We assume standard node_modules structure, or local custom-packages structure
 # Let's search for migrations directory in the package that was just bumped
-if [ -d "node_modules/$RENOVATE_UPDATED_PACKAGE/migrations" ]; then
-    MIGRATIONS_DIR="node_modules/$RENOVATE_UPDATED_PACKAGE/migrations"
-elif [ -d "custom-packages/$RENOVATE_UPDATED_PACKAGE/migrations" ]; then
-    # Handle if it was internally linked and bumped
-    MIGRATIONS_DIR="custom-packages/$RENOVATE_UPDATED_PACKAGE/migrations"
-else
+
+# Since RENOVATE_UPDATED_PACKAGE can contain multiple packages separated by space,
+# let's process them properly if needed. For now, let's just use the first package in the list that has a migrations directory,
+# or loop through them all.
+
+FOUND_MIGRATIONS=false
+
+for PKG in $RENOVATE_UPDATED_PACKAGE; do
+    echo "Checking package: $PKG"
+    
+    # Check node_modules path
+    # Some packages might have scope like @scope/pkg, so $PKG will naturally have a slash
+    if [ -d "node_modules/$PKG/migrations" ]; then
+        MIGRATIONS_DIR="node_modules/$PKG/migrations"
+        echo "Found migrations folder: $MIGRATIONS_DIR"
+        FOUND_MIGRATIONS=true
+        break
+    # Check local custom-packages mapping
+    # Assuming custom packages have the scope removed or are matched directly
+    # E.g. @danieljaurellmevorach/fictional-logger -> we check if it's there
+    # But locally it's named fictional-logger inside custom-packages, but let's check exact match first:
+    elif [ -d "custom-packages/$PKG/migrations" ]; then
+        MIGRATIONS_DIR="custom-packages/$PKG/migrations"
+        echo "Found migrations folder: $MIGRATIONS_DIR"
+        FOUND_MIGRATIONS=true
+        break
+    # As a fallback for locally scoped custom packages, try parsing out the scope
+    elif [[ "$PKG" == @*/* ]]; then
+        UNSCOPED_PKG="${PKG#*/}"
+        if [ -d "custom-packages/$UNSCOPED_PKG/migrations" ]; then
+            MIGRATIONS_DIR="custom-packages/$UNSCOPED_PKG/migrations"
+            echo "Found migrations folder: $MIGRATIONS_DIR"
+            FOUND_MIGRATIONS=true
+            break
+        fi
+    fi
+done
+
+if [ "$FOUND_MIGRATIONS" = false ]; then
     echo "No migrations folder found for $RENOVATE_UPDATED_PACKAGE. Skipping."
     exit 0
 fi
-
-echo "Found migrations folder: $MIGRATIONS_DIR"
 
 MANIFEST_FILE="$MIGRATIONS_DIR/manifest.json"
 
