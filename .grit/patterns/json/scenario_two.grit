@@ -1,0 +1,94 @@
+// ## Scenario 2: Monorepo Target Manipulations (Targets ONLY nested \`frontend/package.json\` & \`backend/package.json\`)
+// This scenario tests the codemod's ability to scope its execution to specific project sub-directories (or by identifying files lacking a \`"workspaces"\` array).
+// 
+// ### Expected Transformations:
+// 1. **Change values:** Bump the \`"version"\` key from \`"0.1.0"\` to \`"1.0.0-beta"\`.
+// 2. **Nested Property Edits:** 
+//    - Inside \`"scripts"\`, add a new key \`"start:prod": "node dist/index.js"\`.
+//    - Change the \`"lint"\` script value to use a new global linter command: \`"npm run lint --workspace root"\`.
+// 3. **Remove keys in nested blocks:** Remove \`"eslint"\` from the \`"devDependencies"\` block.
+// 4. **Alphabetical Sorting:** Ensure \`"dependencies"\` and \`"devDependencies"\` keys are strictly alphabetically sorted.
+// 5. **Structural Standardization:** Clone the \`{"engines": {"node": ">=20.10.0"}}\` property from the root \`package.json\` into these children \`package.json\` files. 
+
+engine marzano(0.1)
+language json
+
+// 1. JavaScript helper to safely remove eslint and sort dependency objects
+function sort_and_clean_deps($val) js {
+    let text = $val.text;
+    try {
+        const obj = JSON.parse(text);
+        
+        // RULE 3: Remove `eslint` if present
+        if (obj["eslint"]) delete obj["eslint"];
+        
+        const sortedKeys = Object.keys(obj).sort();
+        const lines = text.split('\n');
+        const lastLine = lines[lines.length - 1];
+        
+        const rightBrace = String.fromCharCode(125); // '}'
+        const leftBrace = String.fromCharCode(123);  // '{'
+        
+        const indent = lastLine.replace(rightBrace, '');
+        const innerIndent = indent + '  ';
+        
+        let res = leftBrace + '\n';
+        sortedKeys.forEach((k, i) => {
+            res += innerIndent + JSON.stringify(k) + ': ' + JSON.stringify(obj[k]);
+            if (i < sortedKeys.length - 1) res += ',';
+            res += '\n';
+        });
+        res += indent + rightBrace;
+        return res;
+    } catch(e) {
+        return text;
+    }
+}
+
+pattern scenario_two() {
+  file($name, $body) where {
+    
+    // STRICT TARGETING: Only hit the exact required workspace files
+    $name <: includes or { "frontend/package.json", "backend/package.json" }, // i installed a gridql source code repo here...
+
+    // Evaluate all transformation rules independently
+    $body <: contains or {
+      
+      // RULE 1: Bump version ONLY if it is currently "0.1.0"
+      pair(key = `"version"`, value = `"0.1.0"` => `"1.0.0-beta"`),
+
+      // RULE 2: Nested property edits inside "scripts"
+      pair(key = `"scripts"`, value = $scripts) where {
+        $scripts <: contains or {
+            
+            // 2a. Modify the lint value safely in place
+            pair(key = `"lint"`, value = $lint_val) where {
+              $lint_val => `"npm run lint --workspace root"`
+            },
+            
+            // 2b. Inject start:prod cleanly above the "build" script
+            pair(key = `"build"`) as $build_anchor where {
+              $scripts <: not contains pair(key = `"start:prod"`)
+            } => `"start:prod": "node dist/index.js",
+    $build_anchor`
+        }
+      },
+
+      // RULE 3 & 4: Clean eslint and sort dependencies alphabetically
+      pair(key = $dep_key, value = $deps_obj) where {
+        $dep_key <: or { `"dependencies"`, `"devDependencies"` },
+        $deps_obj => sort_and_clean_deps(val = $deps_obj)
+      },
+
+      // RULE 5: Structural Standardization (Clone engines block)
+      pair(key = `"name"`) as $name_anchor where {
+        $body <: not contains pair(key = `"engines"`)
+      } => `$name_anchor,
+  "engines": {
+    "node": ">=20.10.0"
+  }`
+    }
+  }
+}
+
+scenario_two()

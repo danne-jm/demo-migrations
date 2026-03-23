@@ -1,0 +1,78 @@
+// ## Scenario 1: Global Manipulations (Targets ALL \`package.json\` files)
+// This scenario ensures the codemod engine can traverse and apply changes to all \`package.json\` files, including the root workspace and all children.
+// 
+// ### Expected Transformations:
+// 1. **Add new keys:** 
+//    - Add \`"author": "Acme Corp"\` to the top level.
+//    - Add a nested object: \`"repository": { "type": "git", "url": "https://github.com/acme/demo-migrations.git" }\`
+// 2. **Remove keys:** Remove the \`"private": true\` key entirely.
+// 3. **Alphabetical Sorting:** Recursively sort all keys inside the \`"scripts"\` object alphabetically.
+// 4. **Commenting Strings:** Comment out the \`"version"\` key (if the codemod engine supports JSONC formatting like \`// "version": "0.1.0"\`). Alternatively, prefix the key with `_comment_` (e.g. `"_comment_version": "0.1.0"`).
+
+engine marzano(0.1)
+language json
+
+// 1. JavaScript helper to safely parse, sort, and stringify the scripts object
+function sort_scripts_object($val) js {
+    let text = $val.text;
+    try {
+        const obj = JSON.parse(text);
+        const sortedKeys = Object.keys(obj).sort();
+        
+        const lines = text.split('\n');
+        const lastLine = lines[lines.length - 1];
+        
+        // Hide braces from GritQL's parser using ASCII codes!
+        const rightBrace = String.fromCharCode(125); // '}'
+        const leftBrace = String.fromCharCode(123);  // '{'
+        
+        const indent = lastLine.replace(rightBrace, '');
+        const innerIndent = indent + '  ';
+        
+        let res = leftBrace + '\n';
+        sortedKeys.forEach((k, i) => {
+            res += innerIndent + JSON.stringify(k) + ': ' + JSON.stringify(obj[k]);
+            if (i < sortedKeys.length - 1) res += ',';
+            res += '\n';
+        });
+        res += indent + rightBrace;
+        
+        return res;
+    } catch(e) {
+        return text;
+    }
+}
+
+pattern scenario_one() {
+  file($name, $body) where {
+    // Target any package.json globally (root and all workspaces)
+    $name <: includes "package.json",
+    
+    // Process all isolated rules cleanly
+    $body <: contains or {
+      
+      // RULE A: Safely remove `private: true` entirely
+      pair(key = `"private"`) => .,
+
+      // RULE B: "Comment out" the version key by prefixing it
+      pair(key = `"version"`, value = $v) => `"_comment_version": $v`,
+
+      // RULE C: Sort the scripts object alphabetically
+      pair(key = `"scripts"`, value = $scripts_obj) where {
+          $scripts_obj => sort_scripts_object(val = $scripts_obj)
+      },
+
+      // RULE D: Inject new fields (idempotent check so it doesn't run twice)
+      pair(key = `"name"`) as $anchor where {
+          $body <: not contains pair(key = `"author"`)
+      } => `$anchor,
+  "author": "Acme Corp",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/acme/demo-migrations.git"
+  }`
+    }
+  }
+}
+
+scenario_one()
