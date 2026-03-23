@@ -112,8 +112,8 @@ cd "${WORKSPACE_DIR:-.}"
 
 # Install all yaml recipes first before building AST
 for MIGRATION_FILE in $MIGRATIONS_TO_RUN; do
-    # Use relative pathing instead of absolute pathing
-    migration_path="$MIGRATIONS_DIR/$MIGRATION_FILE"
+    # Use absolute pathing as required by Moderne CLI
+    migration_path="$(pwd)/$MIGRATIONS_DIR/$MIGRATION_FILE"
     
     if [ ! -f "$migration_path" ]; then
         echo "Migration file $migration_path not found! Skipping install..."
@@ -131,8 +131,8 @@ mod build .
 for MIGRATION_FILE in $MIGRATIONS_TO_RUN; do
     echo "Processing migration file: $MIGRATION_FILE"
     
-    # Use relative pathing instead of absolute pathing
-    migration_path="$MIGRATIONS_DIR/$MIGRATION_FILE"
+    # Use absolute pathing
+    migration_path="$(pwd)/$MIGRATIONS_DIR/$MIGRATION_FILE"
     
     if [ ! -f "$migration_path" ]; then
         echo "Migration file $migration_path not found! Skipping..."
