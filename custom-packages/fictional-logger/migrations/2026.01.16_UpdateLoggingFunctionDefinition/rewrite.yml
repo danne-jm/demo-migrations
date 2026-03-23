@@ -1,6 +1,6 @@
 ---
 type: specs.openrewrite.org/v1beta/recipe
-name: com.yourorg.UpdateFictionalLogger
+name: com.yourorg.FictionalLoggerV2Migration
 displayName: Fictional Logger V2 Migration
 description: >
   Updates imports and function calls for the fictional-logger v2 update.
