@@ -1,0 +1,12 @@
+{
+  // Downloads schema locally to help user with auto-completion in code editor, allegedly.... removing $schema doesn't change functionality of Renovate
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+
+  // IMPORTANT - Renovate only activates on repositories that have some form of renovate configuration file, and enabled set to true!
+  // Whether it should perform dependecy management.
+  "enabled": true,
+
+  "extends": [
+    "local>danne-jm/demo-migrations//renovate/presets/js.json5",
+  ], 
+}
