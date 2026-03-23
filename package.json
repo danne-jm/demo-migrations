@@ -6,7 +6,6 @@
   "workspaces": [
     "frontend",
     "backend",
-    "fictional-logger",
     "realistic-logger"
   ],
   "scripts": {

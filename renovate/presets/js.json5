@@ -4,7 +4,7 @@
     
     "description": "Preset for JS/TS applications",
 
-    "extends" : [
+    "updateInternalDeps": true, "extends" : [
       "config:recommended", // https://docs.renovatebot.com/presets-config/#:~:text=pinOnlyDevDependencies%22%0A%20%20%5D%0A%7D-,config%3Arecommended,%C2%B6,-Recommended%20configuration%20for
       ":disableDependencyDashboard"
     ],
@@ -18,6 +18,8 @@
     "prConcurrentLimit": 0, // Unlimited concurrent PRs in a repository
     "prHourlyLimit": 0,     // Unlimited PRs per hour 
     
+    "enabledManagers": ["npm"],
+
     "packageRules": [
     // Group all other major updates (catch all)
     {   
@@ -35,6 +37,11 @@
       "matchDatasources": ["npm"],
       "allowedVersions": ">=current",
     },  
+    {
+      "groupName": "workspace-packages",
+      "enabled": true
+    }
+    
   ],
 
 }

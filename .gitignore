@@ -7,4 +7,6 @@ coverage
 .DS_Store
 *.log
 .vscode/settings.json
-renovate/.env
+"renovate/.env"
+npmToken.txt
+.npmrc

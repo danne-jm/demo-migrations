@@ -9,4 +9,11 @@
   "extends": [
     "local>danne-jm/demo-migrations//renovate/presets/js.json5",
   ], 
+
+  "packageRules": [  
+      {  
+        "matchFileNames": ["**/realistic-logger/**", "**/renovate/**", "**/gritql/**", "**/fictional-logger/**"],  
+        "enabled": false  
+      }
+    ]
 }

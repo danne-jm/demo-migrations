@@ -1,4 +1,4 @@
-import { logging as baseLogging } from 'fictional-logger';
+import { logging as baseLogging } from '@danieljaurellmevorach/fictional-logger';
 
 export class LoggerService {
   constructor(private context: string) {}

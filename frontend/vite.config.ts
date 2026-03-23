@@ -4,7 +4,7 @@ import react from '@vitejs/plugin-react';
 export default defineConfig({
   plugins: [react()],
   optimizeDeps: {
-    include: ['fictional-logger']
+    include: ['@danieljaurellmevorach/fictional-logger']
   },
   server: {
     host: '0.0.0.0',
