@@ -1,6 +1,6 @@
 {
   "name": "@danieljaurellmevorach/fictional-logger",
-  "version": "2.2.0",
+  "version": "2.3.0",
   "description": "A fictional logger package for testing codemods and Renovate",
   "main": "dist/index.js",
   "module": "src/index.ts",
