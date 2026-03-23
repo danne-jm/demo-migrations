@@ -1,0 +1,17 @@
+---
+type: specs.openrewrite.org/v1beta/recipe
+name: com.yourorg.FullAppMigration
+displayName: Full Application V2 Migration
+description: >
+  Renames getAllProducts → getAllSellables everywhere (defs, calls, imports)
+  and updates its parameter list to the new signature:
+    getAllSellables(option, token = 404, seed)
+
+recipeList:
+  - com.yourorg.updateLoggingDefinition:
+      oldName: getAllProducts
+      newName: getAllSellables
+      target: all
+  - org.openrewrite.javascript.change-import:
+      oldImport: "com.yourorg.getAllProducts"
+      newImport: "com.yourorg.getAllSellables"
