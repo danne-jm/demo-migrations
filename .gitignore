@@ -10,4 +10,4 @@ coverage
 "renovate/.env"
 npmToken.txt
 .npmrc
-**/moderne
+.moderne
