@@ -14,3 +14,4 @@ npmToken.txt
 rewrite/
 change-import.ts
 codemods/javascript-starter-copy
+javascript-recipe-starter

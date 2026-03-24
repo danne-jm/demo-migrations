@@ -5,10 +5,14 @@ displayName: Fictional Logger V2 Migration
 description: >
   Updates imports and function calls for the fictional-logger v2 update.
 
-recipeList:
-  - org.yourorg.javascript.change-import:
+recipeList: 
+  - org.yourorg.javascript.change-import: # mod run . --recipe=org.yourorg.javascript.change-import -PoldModule="@danieljaurellmevorach/fictional-logger" -PoldMember="logging" -PnewModule="@danieljaurellmevorach/fictional-logger" -PnewMember="logV2" 
       oldModule: "@danieljaurellmevorach/fictional-logger"
       oldMember: "logging"
       newModule: "@danieljaurellmevorach/fictional-logger"
       newMember: "logV2"
-  - com.yourorg.KoaMiddlewareOverhaul
+      
+  - com.yourorg.KoaMiddlewareOverhaul:
+      middlewareToRemove: "requestIdMiddleware"
+      moduleToRemove: "./middleware/request-id"
+      middlewareToAdd: "executionTimeMiddleware"
