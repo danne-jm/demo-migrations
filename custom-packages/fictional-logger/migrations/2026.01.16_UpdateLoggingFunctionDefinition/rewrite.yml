@@ -11,3 +11,4 @@ recipeList:
       oldMember: "logging"
       newModule: "@danieljaurellmevorach/fictional-logger"
       newMember: "logV2"
+  - com.yourorg.KoaMiddlewareOverhaul
