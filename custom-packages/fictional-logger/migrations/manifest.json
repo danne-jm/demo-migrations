@@ -14,7 +14,7 @@
         ]
     },
     {
-        "version": "2.3.0",
+        "version": "2.4.0",
         "description": "Renamed logging function.",
         "migrationFiles": [
             "2026.01.16_UpdateLoggingFunctionDefinition/rewrite.yml"
