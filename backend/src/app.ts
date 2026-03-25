@@ -6,7 +6,6 @@ import cors from '@koa/cors';
 import { env } from './config/env';
 import { errorHandlerMiddleware } from './middleware/error-handler';
 import { rateLimitMiddleware } from './middleware/rate-limit';
-import { requestIdMiddleware } from './middleware/request-id';
 import { requestLoggerMiddleware } from './middleware/request-logger';
 import { securityHeadersMiddleware } from './middleware/security-headers';
 import { router } from './routes';
@@ -17,7 +16,6 @@ export const createApp = (): Koa => {
   app.proxy = env.trustProxy;
 
   app.use(errorHandlerMiddleware());
-  app.use(requestIdMiddleware());
   app.use(requestLoggerMiddleware());
   app.use(securityHeadersMiddleware());
 
