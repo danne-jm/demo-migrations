@@ -1,0 +1,13 @@
+{
+  "name": "tsmorph-codemods",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "change-import": "ts-node change-import.ts"
+  },
+  "dependencies": {
+    "ts-morph": "^27.0.0",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.8.2"
+  }
+}
