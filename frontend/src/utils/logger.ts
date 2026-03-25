@@ -1,4 +1,4 @@
-import { logging as obscureLogger } from '@danieljaurellmevorach/fictional-logger';
+import { logV2 as obscureLogger } from '@danieljaurellmevorach/fictional-logger';
 import log from 'loglevel';
 
 // Set log level to info so it outputs to the console
