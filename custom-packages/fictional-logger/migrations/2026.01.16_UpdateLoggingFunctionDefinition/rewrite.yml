@@ -14,4 +14,4 @@ recipeList:
       
   #mod run . --recipe=org.yourorg.javascript.AddMiddleware -PmiddlewareSpec=koa-helmet:helmet
   - org.yourorg.javascript.AddMiddleware:
-      middlewareSpec: "koa-helmet:helmet"
+      middlewareSpec: "koa-helmet:helmet" 
