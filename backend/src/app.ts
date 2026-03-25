@@ -9,6 +9,7 @@ import { rateLimitMiddleware } from './middleware/rate-limit';
 import { requestLoggerMiddleware } from './middleware/request-logger';
 import { securityHeadersMiddleware } from './middleware/security-headers';
 import { router } from './routes';
+import {helmet} from 'koa-helmet';
 
 export const createApp = (): Koa => {
   const app = new Koa();
@@ -47,6 +48,7 @@ export const createApp = (): Koa => {
   app.use(rateLimitMiddleware());
   app.use(router.routes());
   app.use(router.allowedMethods());
+  app.use(helmet());
 
   return app;
 };
