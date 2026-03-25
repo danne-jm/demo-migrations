@@ -12,7 +12,6 @@ recipeList:
       newModule: "@danieljaurellmevorach/fictional-logger"
       newMember: "logV2"
       
-  - com.yourorg.KoaMiddlewareOverhaul:
-      middlewareToRemove: "requestIdMiddleware"
-      moduleToRemove: "./middleware/request-id"
-      middlewareToAdd: "executionTimeMiddleware"
+  #mod run . --recipe=org.yourorg.javascript.AddMiddleware -PmiddlewareSpec=koa-helmet:helmet
+  - org.yourorg.javascript.AddMiddleware:
+      middlewareSpec: "koa-helmet:helmet"
