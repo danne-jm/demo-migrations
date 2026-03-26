@@ -1,0 +1,102 @@
+# OpenRewrite JSON recipes — Scenario 2: Monorepo Target Manipulations
+#
+# Targets ONLY:
+#   - frontend/package.json
+#   - backend/package.json
+#
+# Run with Moderne CLI:
+#   1. Build LSTs (required when files have uncommitted changes):
+#        mod build .
+#   2. Install this YAML (no JAR republish needed — no new Java recipes):
+#        mod config recipes yaml install codemods/openrewrite/package-json-scenario2-recipes.yml
+#   3. Run:
+#        mod run . --recipe org.acme.packagejson.ScenarioTwo
+#
+# ──────────────────────────────────────────────────────────────────────────────
+# Known formatting limitations (inherited from Scenario 1 findings):
+#
+#   ⚠ SortJsonObjectKeys (Transformation 4) calls autoFormat() which degrades
+#     indentation (4-space → 2-space) and may merge closing } onto the last
+#     entry. Sibling objects can be affected. Formatting-only; JSON stays valid.
+#
+#   ⚠ AddKeyValue (Transformations 2a and 5) appends new members inline on the
+#     same line as the last existing member. Formatting-only; JSON stays valid.
+#
+# All issues are cosmetic — npm, node, and all JSON parsers will read the
+# output correctly.
+# ──────────────────────────────────────────────────────────────────────────────
+
+---
+type: specs.openrewrite.org/v1beta/recipe
+name: org.acme.packagejson.ScenarioTwo
+displayName: "Scenario 2 — Monorepo target manipulations (frontend + backend only)"
+description: >
+  Targets frontend/package.json and backend/package.json only.
+  Bumps version to 1.0.0-beta, adds start:prod script, updates lint command,
+  removes eslint from devDependencies, sorts dependencies alphabetically,
+  and clones the engines property from the root package.json.
+preconditions:
+  # Ant-style brace group: matches frontend/package.json and backend/package.json
+  # at the repo root level only. Leaves root package.json, custom-packages/**,
+  # and codemods/** untouched.
+  - org.openrewrite.FindSourceFiles:
+      filePattern: "{frontend,backend}/package.json"
+recipeList:
+
+  # ── Transformation 1: Bump "version" to "1.0.0-beta" ─────────────────────
+  # ChangeValue's path parameter is named "oldKeyPath" (not "keyPath").
+  # The value string must include the enclosing JSON double-quotes.
+  - org.openrewrite.json.ChangeValue:
+      oldKeyPath: "$.version"
+      value: '"1.0.0-beta"'
+
+  # ── Transformation 2a: Add "start:prod" script ────────────────────────────
+  # keyPath "$.scripts" targets the scripts object. AddKeyValue appends the
+  # new member inline on the last existing scripts entry (known limitation).
+  # Idempotent: no-op if "start:prod" already exists.
+  - org.openrewrite.json.AddKeyValue:
+      keyPath: "$.scripts"
+      key: "start:prod"
+      value: '"node dist/index.js"'
+
+  # ── Transformation 2b: Update "lint" script value ─────────────────────────
+  # "$.scripts.lint" navigates into the scripts object to the lint member.
+  # Replaces whatever value is there (frontend and backend have different
+  # existing lint commands; both are replaced uniformly).
+  - org.openrewrite.json.ChangeValue:
+      oldKeyPath: "$.scripts.lint"
+      value: '"npm run lint --workspace root"'
+
+  # ── Transformation 3: Remove "eslint" from "devDependencies" ─────────────
+  # Both frontend and backend have "eslint": "^9.23.0" in devDependencies.
+  # DeleteKey is a no-op on files that don't have the key.
+  - org.openrewrite.json.DeleteKey:
+      keyPath: "$.devDependencies.eslint"
+
+  # ── Transformation 4a: Sort "dependencies" alphabetically ─────────────────
+  # Custom recipe from rewrite/rewrite-json/src/main/java/org/openrewrite/json/SortJsonObjectKeys.java
+  # See known autoFormat() formatting limitation in header notes.
+  - org.openrewrite.json.SortJsonObjectKeys:
+      keyPath: "$.dependencies"
+
+  # ── Transformation 4b: Sort "devDependencies" alphabetically ──────────────
+  # Runs after Transformation 3 so the removed "eslint" key is not included
+  # in the sort. Key order:
+  #   backend:  @types/koa → @types/koa-bodyparser → @types/koa__cors →
+  #             @types/koa__router → @types/node → ts-node-dev → typescript
+  #   frontend: @types/node → @types/react → @types/react-dom →
+  #             @typescript-eslint/eslint-plugin → @typescript-eslint/parser →
+  #             @vitejs/plugin-react → typescript → vite
+  - org.openrewrite.json.SortJsonObjectKeys:
+      keyPath: "$.devDependencies"
+
+  # ── Transformation 5: Clone "engines" from root package.json ──────────────
+  # Root package.json has: "engines": {"node": ">=20.10.0"}
+  # Neither frontend nor backend currently has an "engines" key.
+  # The value is hardcoded here (matches root exactly). Idempotent: no-op if
+  # "engines" already exists.
+  # See known AddKeyValue inline-append limitation in header notes.
+  - org.openrewrite.json.AddKeyValue:
+      keyPath: "$"
+      key: engines
+      value: '{"node": ">=20.10.0"}'

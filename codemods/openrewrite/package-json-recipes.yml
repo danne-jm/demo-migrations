@@ -1,0 +1,133 @@
+# OpenRewrite JSON recipes — Scenario 1: Global package.json manipulations
+#
+# Applies to ALL package.json files in the monorepo:
+#   - /package.json
+#   - /backend/package.json
+#   - /custom-packages/fictional-logger/package.json
+#   - /custom-packages/realistic-logger/package.json
+#
+# Run with Moderne CLI:
+#   1. Build LSTs (required when package.json files have uncommitted changes):
+#        mod build .
+#   2. Install the custom recipe JAR (after any changes to rewrite-json):
+#        cd rewrite && ./gradlew -Didea.active=true --configure-on-demand \
+#            :rewrite-json:publishToMavenLocal
+#        cd .. && mod config recipes jar install org.openrewrite:rewrite-json:8.77.0-SNAPSHOT
+#        mod config recipes yaml install codemods/openrewrite/package-json-recipes.yml
+#   3. Run:
+#        mod run . --recipe org.acme.packagejson.ScenarioOne
+#
+# ──────────────────────────────────────────────────────────────────────────────
+# OpenRewrite vs jq for JSON codemods
+# ──────────────────────────────────────────────────────────────────────────────
+#
+# OpenRewrite strengths:
+#   ✅ Monorepo traversal built-in — no shell loops, applies to every match
+#   ✅ Idempotent by design — AddKeyValue skips keys that already exist
+#   ✅ Composable, auditable, supports dry-run via `mod run --dry-run`
+#   ✅ JsonPath-based targeting is precise
+#   ✅ Unmodified nodes ARE format-preserved — whitespace/key order untouched
+#
+# OpenRewrite limitations observed in this run:
+#   ❌ No JSONC support — strict JSON parser; cannot emit // comments
+#   ❌ AddKeyValue appends new members inline on the last line of the object —
+#      does not insert a leading newline/indent before the new member
+#   ❌ autoFormat() does NOT preserve original indentation — SortJsonObjectKeys
+#      dropped 4-space indent to 2-space and merged closing } with last entry
+#   ❌ ChangeKey requires double-quotes embedded in the newKey string value;
+#      use YAML single-quotes: '"_comment_version"' (not "_comment_version")
+#   ❌ No built-in alphabetical key sort — requires a custom recipe
+#      (see SortJsonObjectKeys.java in rewrite/rewrite-json/src/main/java/)
+#   ❌ Requires JVM + Gradle/Maven build or Moderne CLI to run
+#
+# jq strengths:
+#   ✅ Concise one-liners; sorting is trivial:
+#        jq '.scripts |= (to_entries | sort_by(.key) | from_entries)' package.json
+#   ✅ Great for ad-hoc queries and CI pipelines
+#   ✅ Lightweight CLI, no runtime dependencies
+#
+# jq weaknesses:
+#   ❌ Fully reformats output — destroys existing whitespace and blank lines
+#   ❌ No format preservation whatsoever
+#   ❌ Single-file at a time; monorepo iteration requires a shell loop
+#   ❌ Not idempotent by default
+#
+# Verdict: OpenRewrite's "format-preserving" guarantee applies only to nodes
+# that are NOT structurally changed. Recipes that reorder or insert members
+# trigger autoFormat() or inline-append behavior — producing similarly
+# reformatted output to jq for those nodes. OpenRewrite wins on monorepo
+# scope, idempotency, audit trails, and dry-run previews.
+# ──────────────────────────────────────────────────────────────────────────────
+
+---
+type: specs.openrewrite.org/v1beta/recipe
+name: org.acme.packagejson.ScenarioOne
+displayName: "Scenario 1 — Global package.json manipulations"
+description: >
+  Applies to all package.json files in the monorepo:
+  adds "author" and "repository" keys, removes "private",
+  sorts "scripts" alphabetically, and disables the "version" key.
+preconditions:
+  # Scope every sub-recipe to package.json files only.
+  # Without this, AddKeyValue/DeleteKey would also touch
+  # tsconfig.json, manifest.json, etc.
+  - org.openrewrite.FindSourceFiles:
+      filePattern: "**/package.json"
+recipeList:
+
+  # ── Transformation 1a: Add "author": "Acme Corp" ──────────────────────────
+  # keyPath "$" targets the root JSON object ("$." is invalid JsonPath syntax).
+  # AddKeyValue is a no-op if the key already exists (idempotent).
+  # NOTE (observed limitation): the new member is appended inline on the same
+  # line as the last existing member rather than on a new indented line.
+  - org.openrewrite.json.AddKeyValue:
+      keyPath: "$"
+      key: author
+      value: '"Acme Corp"'
+
+  # ── Transformation 1b: Add "repository": { "type": "git", "url": "..." } ──
+  # The value is a raw JSON object literal — OpenRewrite inserts it as a
+  # Json.JsonObject node. Same inline-append limitation as Transformation 1a.
+  - org.openrewrite.json.AddKeyValue:
+      keyPath: "$"
+      key: repository
+      value: >-
+        {"type": "git", "url": "https://github.com/acme/demo-migrations.git"}
+
+  # ── Transformation 2: Remove "private": true ──────────────────────────────
+  # $.private matches the top-level "private" member.
+  # DeleteKey removes the entire key–value pair, including the trailing comma
+  # that the LST re-prints after the structural change.
+  - org.openrewrite.json.DeleteKey:
+      keyPath: "$.private"
+
+  # ── Transformation 3: Sort "scripts" keys alphabetically ──────────────────
+  # Custom recipe: rewrite/rewrite-json/src/main/java/org/openrewrite/json/SortJsonObjectKeys.java
+  # Rebuild + republish after changes: cd rewrite && ./gradlew -Didea.active=true
+  #   --configure-on-demand :rewrite-json:publishToMavenLocal
+  # NOTE (observed limitation): autoFormat() does not mirror the original
+  # indentation style. In this monorepo, 4-space indent was normalised to
+  # 2-space and the closing "}" was placed on the same line as the last entry.
+  - org.openrewrite.json.SortJsonObjectKeys:
+      keyPath: "$.scripts"
+
+  # ── Transformation 4: "Comment out" the "version" key ────────────────────
+  # Standard JSON has no comment syntax. OpenRewrite's JSON parser is a strict
+  # JSON parser — it cannot emit // "version": "0.1.0" (JSONC) because the LST
+  # has no Comment node that prints before a member.
+  #
+  # The closest legal alternative: rename the key from "version" to
+  # "_comment_version" so it is clearly disabled without breaking JSON validity.
+  # Tooling (npm, Node) will ignore unknown top-level keys.
+  #
+  # IMPORTANT — quoting: newKey must include the enclosing double-quotes as
+  # part of the string value. Use YAML single-quotes to embed them:
+  #   newKey: '"_comment_version"'   ← correct  (emits: "_comment_version": …)
+  #   newKey: "_comment_version"     ← BUG      (emits: _comment_version: … — invalid JSON)
+  #
+  # If true JSONC output is required, switch to a JSONC-aware tool (e.g., a
+  # custom TextEdit recipe that does a raw string replacement, accepting the
+  # loss of format-preservation for that node).
+  - org.openrewrite.json.ChangeKey:
+      oldKeyPath: "$.version"
+      newKey: '"_comment_version"'
