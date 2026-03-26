@@ -1,0 +1,111 @@
+# OpenRewrite YAML recipes — Scenario 2: Inline Step Modifications
+#
+# Targets ONLY .azure/pipelines/fullstack-ci-cd.yml.
+#
+# Run with Moderne CLI:
+#   mod config recipes yaml install codemods/openrewrite/pipeline-yaml-scenario2-recipes.yml
+#   mod run . --recipe org.acme.azurepipeline.ScenarioTwo
+#
+# ──────────────────────────────────────────────────────────────────────────────
+# Recipe overview
+# ──────────────────────────────────────────────────────────────────────────────
+#
+# Transformation 1  — org.openrewrite.yaml.ChangeValue
+#   Rename the task: NodeTool@0 → UseNode@1.
+#   Uses a JsonPath predicate to target only the NodeTool@0 step, leaving
+#   other tasks (e.g. Cache@2) untouched.
+#
+# Transformation 2  — org.openrewrite.yaml.ChangeKey
+#   Rename the input key versionSpec → version inside the NodeTool step.
+#   ChangeKey has no filePattern; scoping is handled by the outer preconditions
+#   block. Uses a relative path (.versionSpec) to match the key at any depth
+#   in the single scoped file — confirmed by ChangeKeyTest.changeRelativeKey().
+#
+# Transformation 3  — org.openrewrite.text.FindAndReplace (regex)
+#   Inject "npm audit fix --audit-level=high" between "npm install" and
+#   "npm build" in the multi-line block scalar script.
+#   Regex groups capture the install line (group 1), the leading indentation
+#   (group 2), and the build command (group 3). Group 2 is reused for the
+#   injected line so indentation is preserved regardless of indent depth.
+#
+#   Scenario constraint: "Do not replace the existing script string completely;
+#   utilize regex or string manipulation functions to patch the interior."
+#
+# ──────────────────────────────────────────────────────────────────────────────
+# ORDERING CONSTRAINT
+# FindAndReplace (T3) converts the file to a PlainText representation for the
+# remainder of the composite recipe run. YAML AST recipes (T1, T2) must all
+# execute before T3 or they will see no YAML nodes to match.
+# ──────────────────────────────────────────────────────────────────────────────
+#
+# FALLBACK NOTE (T1)
+# If ChangeValue with the 3-level wildcard path produces no diff (the
+# JsonPathMatcher silently fails multi-level [*] traversal), replace T1 with:
+#
+#   - org.openrewrite.text.FindAndReplace:
+#       find: "task: NodeTool@0"
+#       replace: "task: UseNode@1"
+#       filePattern: "**/.azure/pipelines/fullstack-ci-cd.yml"
+#
+# Place that FindAndReplace before T3 (T2 ChangeKey must still precede it).
+# ──────────────────────────────────────────────────────────────────────────────
+
+---
+type: specs.openrewrite.org/v1beta/recipe
+name: org.acme.azurepipeline.ScenarioTwo
+displayName: "Azure Pipeline Scenario 2 — Inline Step Modifications"
+description: >
+  Targets .azure/pipelines/fullstack-ci-cd.yml only.
+  Renames NodeTool@0 to UseNode@1, renames the versionSpec input key
+  to version, and injects npm audit fix --audit-level=high between
+  npm install and npm build in the workspace setup script.
+preconditions:
+  - org.openrewrite.FindSourceFiles:
+      filePattern: "**/.azure/pipelines/fullstack-ci-cd.yml"
+recipeList:
+
+  # ── Transformation 1: NodeTool@0 → UseNode@1 ────────────────────────────────
+  # ChangeValue with a predicate path: targets only the step whose task field
+  # equals NodeTool@0, so Cache@2 and other steps are not affected.
+  # The 3-level wildcard path $.stages[*].jobs[*].steps[?(@.task == 'NodeTool@0')].task
+  # is supported by OpenRewrite's JsonPathMatcher — confirmed by MergeYamlTest
+  # which uses chained predicate paths like $.jobs[?(@.name=='test')].plan[?(@.task=='sonar')].
+  - org.openrewrite.yaml.ChangeValue:
+      keyPath: "$.stages[*].jobs[*].steps[?(@.task == 'NodeTool@0')].task"
+      value: "UseNode@1"
+      filePattern: "**/.azure/pipelines/fullstack-ci-cd.yml"
+
+  # ── Transformation 2: versionSpec → version (key rename) ────────────────────
+  # ChangeKey has no filePattern parameter; the outer preconditions block
+  # restricts this to fullstack-ci-cd.yml. The relative path .versionSpec
+  # matches the key at any depth in the file (confirmed by ChangeKeyTest).
+  # versionSpec exists exactly once in this file (inside NodeTool@0's inputs).
+  - org.openrewrite.yaml.ChangeKey:
+      oldKeyPath: ".versionSpec"
+      newKey: "version"
+
+  # ── Transformation 3: Inject npm audit fix into multi-line script ────────────
+  # MUST RUN LAST — FindAndReplace converts the file to plain text for the
+  # remainder of the recipe run. T1 and T2 (YAML AST) have already completed.
+  #
+  # Regex groups (find):
+  #   $1 = "npm install"        (install command, no trailing newline)
+  #   $2 = "\n"                 (the newline — captured so it can be reused in
+  #                              the replacement without needing a literal \n,
+  #                              which Java's Matcher.replaceAll does not support)
+  #   $3 = leading spaces       (indentation of npm build, e.g. 14 spaces)
+  #   $4 = "npm build"          (the build command)
+  #
+  # Replacement: $1$2$3<injected>$2$3$4
+  #   expands to: npm install + \n + <indent> + npm audit fix ... + \n + <indent> + npm build
+  #
+  # Java's Matcher.replaceAll uses $N (dollar-sign) not \N for backreferences.
+  # The newline is carried through $2 so no \n literal appears in the replace
+  # string (which Java does not recognise as a newline in replacement context).
+  # YAML double-quoted scalar: \\n in the find string becomes \n after YAML
+  # parsing, which the regex engine then interprets as a newline character.
+  - org.openrewrite.text.FindAndReplace:
+      find: "(npm install)(\\n)( +)(npm build)"
+      replace: "$1$2$3npm audit fix --audit-level=high$2$3$4"
+      regex: true
+      filePattern: "**/.azure/pipelines/fullstack-ci-cd.yml"

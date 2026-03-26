@@ -1,4 +1,0 @@
-[smart_auto_nest]
-match = ":[prefix]_:[key~[A-Z0-9]+]=:[val\n]"
-rewrite = ":[prefix]__:[key]=:[val]"
-rule = "where match :[prefix] { | \"DB\" -> true | \"API\" -> true | \"AWS\" -> true | \"S3\" -> true | \"MAIL\" -> true }"

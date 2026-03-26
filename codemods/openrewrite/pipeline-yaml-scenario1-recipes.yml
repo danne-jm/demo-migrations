@@ -1,0 +1,148 @@
+# OpenRewrite YAML recipes — Scenario 1: Azure Pipeline Variable Manipulations
+#
+# Targets ALL Azure Pipeline YAML files under .azure/:
+#   - .azure/pipelines/fullstack-ci-cd.yml        (has variables: block)
+#   - .azure/templates/deploy/deploy-backend.yml  (has parameters: block only)
+#   - .azure/templates/deploy/deploy-frontend.yml (has parameters: block only)
+#
+# Run with Moderne CLI:
+#   mod config recipes yaml install codemods/openrewrite/pipeline-yaml-scenario1-recipes.yml
+#   mod run . --recipe org.acme.azurepipeline.ScenarioOne --dry-run
+#   mod run . --recipe org.acme.azurepipeline.ScenarioOne
+#
+# ──────────────────────────────────────────────────────────────────────────────
+# Custom Java recipes written for this scenario
+# ──────────────────────────────────────────────────────────────────────────────
+#
+# org.openrewrite.yaml.ChangeNamedSequenceEntry
+#   Renames the 'name:' field of a sequence item identified by its current name.
+#   Source: rewrite/rewrite-yaml/.../yaml/ChangeNamedSequenceEntry.java
+#
+# org.openrewrite.yaml.DeleteNamedSequenceEntry
+#   Deletes a sequence item whose 'name:' field matches a given value.
+#   Source: rewrite/rewrite-yaml/.../yaml/DeleteNamedSequenceEntry.java
+#
+# Both recipes are wrappers around the built-in ChangeValue / DeleteKey recipes.
+# The equivalent built-in calls (using predicate-path syntax) are shown inline
+# in the comments below. The custom recipes exist purely for readability — the
+# predicate-path syntax IS supported by both built-ins.
+#
+# ──────────────────────────────────────────────────────────────────────────────
+# Recipe overview
+# ──────────────────────────────────────────────────────────────────────────────
+#
+# Transformation 1  — org.openrewrite.yaml.MergeYaml
+#   Add AZURE_SUBSCRIPTION to the variables: sequence in fullstack-ci-cd.yml.
+#   objectIdentifyingProperty: name makes this idempotent — MergeYaml deduplicates
+#   by the "name" field and will not insert a duplicate on repeated runs.
+#
+# Transformation 2  — ChangeNamedSequenceEntry × 2 + FindAndReplace × 1
+#   Rename ENVIRONMENT → AZ_ENV:
+#     2a. variables: sequence in fullstack-ci-cd.yml
+#     2b. parameters: sequence in both deploy templates
+#     2c. String-value usages (${{ variables.ENVIRONMENT }}) via FindAndReplace
+#
+#   Built-in equivalents (no custom recipe required):
+#     ChangeValue: keyPath: "$.variables[?(@.name == 'ENVIRONMENT')].name"  value: "AZ_ENV"
+#     ChangeValue: keyPath: "$.parameters[?(@.name == 'ENVIRONMENT')].name" value: "AZ_ENV"
+#
+# Transformation 3  — DeleteNamedSequenceEntry × 2
+#   Remove the NODE_ENV variable/parameter definition:
+#     3a. variables: sequence in fullstack-ci-cd.yml
+#     3b. parameters: sequence in both deploy templates
+#
+#   Built-in equivalents (no custom recipe required):
+#     DeleteKey: keyPath: "$.variables[?(@.name == 'NODE_ENV')]"
+#     DeleteKey: keyPath: "$.parameters[?(@.name == 'NODE_ENV')]"
+#
+# ──────────────────────────────────────────────────────────────────────────────
+
+---
+type: specs.openrewrite.org/v1beta/recipe
+name: org.acme.azurepipeline.ScenarioOne
+displayName: "Azure Pipeline Scenario 1 — Variable Manipulations"
+description: >
+  Applies to all Azure Pipeline YAML files in .azure/.
+  Adds AZURE_SUBSCRIPTION to the variables block, renames ENVIRONMENT to
+  AZ_ENV globally (definition + all usages), and removes the NODE_ENV
+  variable/parameter definition from every file.
+preconditions:
+  # Restrict the entire recipe to Azure Pipeline YAML files only.
+  # Individual sub-recipes may further narrow scope via filePattern.
+  - org.openrewrite.FindSourceFiles:
+      filePattern: "**/.azure/**/*.yml"
+recipeList:
+
+  # ── Transformation 1: Add AZURE_SUBSCRIPTION to variables: sequence ────────
+  # MergeYaml merges the incoming YAML into the document at the root key.
+  # objectIdentifyingProperty: name deduplicates by the "name" field, so
+  # running the recipe twice will not insert a second AZURE_SUBSCRIPTION entry.
+  # Scoped to the main pipeline — deploy templates have no variables: block.
+  # NOTE: acceptTheirs must NOT be set here — MergeYamlVisitor.mergeSequence
+  # returns s1 immediately when acceptTheirs=true, preventing any new entries
+  # from being added.
+  - org.openrewrite.yaml.MergeYaml:
+      key: "$"
+      yaml: |
+        variables:
+          - name: AZURE_SUBSCRIPTION
+            value: "sp-main-production"
+      objectIdentifyingProperty: "name"
+      filePattern: "**/.azure/pipelines/fullstack-ci-cd.yml"
+
+  # ── Transformation 2a: Rename ENVIRONMENT → AZ_ENV in variables: ───────────
+  # Custom recipe: find the item with name: ENVIRONMENT in the variables:
+  # sequence and rename it to AZ_ENV.
+  # Built-in equivalent:
+  #   ChangeValue: keyPath: "$.variables[?(@.name == 'ENVIRONMENT')].name"
+  #                value: "AZ_ENV"
+  - org.openrewrite.yaml.ChangeNamedSequenceEntry:
+      sequencePath: "$.variables"
+      entryName: "ENVIRONMENT"
+      newEntryName: "AZ_ENV"
+      filePattern: "**/.azure/pipelines/fullstack-ci-cd.yml"
+
+  # ── Transformation 2b: Rename ENVIRONMENT → AZ_ENV in parameters: ──────────
+  # Same operation on the parameters: sequence in the deploy templates.
+  # Built-in equivalent:
+  #   ChangeValue: keyPath: "$.parameters[?(@.name == 'ENVIRONMENT')].name"
+  #                value: "AZ_ENV"
+  - org.openrewrite.yaml.ChangeNamedSequenceEntry:
+      sequencePath: "$.parameters"
+      entryName: "ENVIRONMENT"
+      newEntryName: "AZ_ENV"
+      filePattern: "**/.azure/templates/**/*.yml"
+
+  # ── Transformation 3a: Remove NODE_ENV from variables: ──────────────────────
+  # Custom recipe: delete the item with name: NODE_ENV from the variables:
+  # sequence in the main pipeline.
+  # Built-in equivalent:
+  #   DeleteKey: keyPath: "$.variables[?(@.name == 'NODE_ENV')]"
+  # NOTE: must run before FindAndReplace (T2c) — FindAndReplace converts files
+  # to a plain-text representation, which breaks YAML AST visitors that follow.
+  - org.openrewrite.yaml.DeleteNamedSequenceEntry:
+      sequencePath: "$.variables"
+      entryName: "NODE_ENV"
+      filePattern: "**/.azure/pipelines/fullstack-ci-cd.yml"
+
+  # ── Transformation 3b: Remove NODE_ENV from parameters: ─────────────────────
+  # Same operation on the parameters: sequence in the deploy templates.
+  # Built-in equivalent:
+  #   DeleteKey: keyPath: "$.parameters[?(@.name == 'NODE_ENV')]"
+  - org.openrewrite.yaml.DeleteNamedSequenceEntry:
+      sequencePath: "$.parameters"
+      entryName: "NODE_ENV"
+      filePattern: "**/.azure/templates/**/*.yml"
+
+  # ── Transformation 2c: Update ${{ variables.ENVIRONMENT }} references ───────
+  # Text-level replacement handles string-value usage sites that are outside
+  # the variables/parameters blocks:
+  #   value: '${{ variables.ENVIRONMENT }}'  (environmentTemplate variable)
+  #   default: ${{ variables.ENVIRONMENT }}  (parameter defaults in templates)
+  # Targeting the substring "variables.ENVIRONMENT" avoids false-positive
+  # matches on bare identifiers in unrelated script lines.
+  # NOTE: runs last because FindAndReplace converts files to plain-text, which
+  # would prevent subsequent YAML AST recipes from matching.
+  - org.openrewrite.text.FindAndReplace:
+      find: "variables.ENVIRONMENT"
+      replace: "variables.AZ_ENV"
